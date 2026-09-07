@@ -319,9 +319,11 @@ git checkout main
 Bật Pages không cần vào giao diện web:
 
 ```bash
-gh api -X POST /repos/hoanghdtv/expo-app-update/pages \
+gh api -X POST repos/hoanghdtv/expo-app-update/pages \
   -f "source[branch]=gh-pages" -f "source[path]=/"
 ```
+
+Đường dẫn endpoint **không có dấu `/` đứng đầu**: Git Bash sẽ viết lại `/repos/...` thành đường dẫn filesystem và `gh` báo `invalid API endpoint`.
 
 Nếu trả về lỗi `409 Conflict` nghĩa là Pages đã bật rồi — bỏ qua, đi tiếp.
 
@@ -330,7 +332,7 @@ Nếu trả về lỗi `409 Conflict` nghĩa là Pages đã bật rồi — bỏ
 Chờ Pages deploy (~1–2 phút). Kiểm tra tiến độ:
 
 ```bash
-gh api /repos/hoanghdtv/expo-app-update/pages/builds/latest --jq '.status'
+gh api repos/hoanghdtv/expo-app-update/pages/builds/latest --jq '.status'
 ```
 
 Kỳ vọng `built`. Rồi:
