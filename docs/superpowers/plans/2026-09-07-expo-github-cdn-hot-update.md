@@ -1427,7 +1427,7 @@ Kỳ vọng: `HTTP/2 200`. Đây là chỗ rủi ro của spec mục 9 — nếu
 - [ ] **Step 5: KỊCH BẢN E2E #2 — update asset**
 
 1. Trên app: check → fetch → restart. Xác nhận ảnh và font mới xuất hiện.
-2. Thay bằng ảnh khác hẳn: `cp assets/adaptive-icon.png assets/demo/photo.png` (hoặc file PNG thứ hai đã chọn ở Step 1).
+2. Thay bằng ảnh khác hẳn: `cp assets/splash-icon.png assets/demo/photo.png` (hoặc file PNG thứ hai đã chọn ở Step 1).
 3. `npm run export:android` rồi `npm run publish:update`, commit và push trong `site/`.
 4. Trên app: check → fetch → restart.
 
