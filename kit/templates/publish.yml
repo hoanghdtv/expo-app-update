@@ -1,0 +1,63 @@
+name: Publish update
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Channel
+        required: true
+        default: production
+      runtimeVersion:
+        description: Runtime version
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Xác minh bản vá expo-updates đã được áp
+        run: bash scripts/verify-updates-patch.sh
+
+      - name: Áp input vào update.config.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const c = JSON.parse(fs.readFileSync('update.config.json', 'utf-8'));
+            c.channel = process.env.CHANNEL;
+            c.runtimeVersion = process.env.RUNTIME_VERSION;
+            fs.writeFileSync('update.config.json', JSON.stringify(c, null, 2) + '\n');
+          "
+          cat update.config.json
+        env:
+          CHANNEL: ${{ inputs.channel }}
+          RUNTIME_VERSION: ${{ inputs.runtimeVersion }}
+
+      - run: npm run export:android
+      - run: npm run publish:update
+
+      - name: Commit lên gh-pages
+        working-directory: site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "publish: ${{ inputs.channel }} ${{ inputs.runtimeVersion }} (${{ github.sha }})"
+          git push

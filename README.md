@@ -232,6 +232,7 @@ Nó được **giữ lại có chủ đích làm đường lui**: kiến trúc h
 
 ## Tham khảo thêm
 
+- **Port cơ chế này sang dự án Expo khác**: [`kit/README.md`](kit/README.md) — hướng dẫn đầy đủ + script cài `kit/install.sh`
 - Thiết kế đầy đủ: [`docs/superpowers/specs/2026-09-07-expo-github-cdn-hot-update-design.md`](docs/superpowers/specs/2026-09-07-expo-github-cdn-hot-update-design.md)
 - Kết quả kiểm chứng rollback trên thiết bị: [`docs/rollback-notes.md`](docs/rollback-notes.md)
 - Kết quả kiểm chứng gating trên thiết bị: [`docs/gating-notes.md`](docs/gating-notes.md)
