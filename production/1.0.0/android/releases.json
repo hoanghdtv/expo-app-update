@@ -5,6 +5,46 @@
   "releases": [
     {
       "id": "836da8e8-9a78-6e99-8648-43e1d2f0aaaa",
+      "createdAt": "2026-09-07T09:22:37.149Z",
+      "gitSha": "3993a9e024dae3510fa77b9c296dc5e6fe0b3112",
+      "manifest": {
+        "id": "836da8e8-9a78-6e99-8648-43e1d2f0aaaa",
+        "createdAt": "2026-09-07T09:22:37.149Z",
+        "runtimeVersion": "1.0.0",
+        "launchAsset": {
+          "hash": "lauDkdpfl0I-LuCVVINSqaHxMEiPbDix5j6TyrUp_uA",
+          "key": "04ce0be01a8ea841aa33c9beb2e99435",
+          "contentType": "application/javascript",
+          "url": "https://hoanghdtv.github.io/expo-app-update/store/95ab8391da5f97423e2ee095548352a9a1f130488f6c38b1e63e93cab529fee0.js"
+        },
+        "assets": [],
+        "metadata": {},
+        "extra": {
+          "expoClient": {
+            "name": "expo-app-update",
+            "slug": "expo-app-update",
+            "version": "1.0.0",
+            "orientation": "portrait",
+            "android": {
+              "package": "com.hoanghdtv.expoappupdate"
+            },
+            "runtimeVersion": "1.0.0",
+            "updates": {
+              "url": "https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json",
+              "enabled": true,
+              "checkAutomatically": "ON_LOAD",
+              "fallbackToCacheTimeout": 0
+            },
+            "extra": {
+              "updateChannel": "production",
+              "baseUrl": "https://hoanghdtv.github.io/expo-app-update"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "836da8e8-9a78-6e99-8648-43e1d2f0aaaa",
       "createdAt": "2026-09-07T09:19:06.816Z",
       "gitSha": "3993a9e024dae3510fa77b9c296dc5e6fe0b3112",
       "manifest": {
