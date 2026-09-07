@@ -1,14 +1,17 @@
+import { Inter_700Bold } from '@expo-google-fonts/inter';
 import Constants from 'expo-constants';
+import { useFonts } from 'expo-font';
 import * as Updates from 'expo-updates';
 import { useUpdates } from 'expo-updates';
 import { useState } from 'react';
-import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Button, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BANNER_COLOR, BANNER_TEXT } from './version';
 
 export default function UpdatePanel() {
   const { currentlyRunning, isUpdateAvailable, isUpdatePending, isChecking,
           isDownloading, checkError, downloadError } = useUpdates();
   const [log, setLog] = useState<string[]>([]);
+  const [fontsLoaded] = useFonts({ Inter_700Bold });
   const append = (line: string) =>
     setLog((prev) => [`${new Date().toISOString().slice(11, 19)}  ${line}`, ...prev]);
 
@@ -19,6 +22,11 @@ export default function UpdatePanel() {
       <View style={[styles.banner, { backgroundColor: BANNER_COLOR }]}>
         <Text style={styles.bannerText}>{BANNER_TEXT}</Text>
       </View>
+
+      <Image source={require('../assets/demo/photo.png')} style={styles.demo} />
+      <Text style={fontsLoaded ? styles.fontDemo : undefined}>
+        Mau font tuy chinh 0123456789
+      </Text>
 
       <Text style={styles.row}>updateId: {currentlyRunning.updateId ?? '(none)'}</Text>
       <Text style={styles.row}>createdAt: {currentlyRunning.createdAt?.toISOString() ?? '(none)'}</Text>
@@ -52,6 +60,8 @@ const styles = StyleSheet.create({
   page: { padding: 20, paddingTop: 60, gap: 6 },
   banner: { padding: 24, borderRadius: 12, marginBottom: 12 },
   bannerText: { color: 'white', fontSize: 28, fontWeight: '700', textAlign: 'center' },
+  demo: { width: 160, height: 160, alignSelf: 'center', marginBottom: 12 },
+  fontDemo: { fontFamily: 'Inter_700Bold', fontSize: 18, marginBottom: 12 },
   row: { fontSize: 13 },
   err: { fontSize: 13, color: '#b91c1c' },
   log: { fontSize: 11, color: '#555' },
