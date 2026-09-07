@@ -85,7 +85,41 @@ Content-Type: application/json; charset=utf-8
 
 Chỉ `expo-protocol-version` là bắt buộc. `expo-server-defined-headers` và `expo-manifest-filters` đều tùy chọn (kiểu nullable trong `ResponseHeaderData`).
 
-#### Quyết định sửa: Cloudflare Pages làm tầng phục vụ
+#### Quyết định cuối: vá một dòng trong client, giữ GitHub thuần
+
+**Đây là hướng đang dùng.** Phương án Cloudflare Pages bên dưới được giữ lại làm dự phòng đã kiểm chứng.
+
+Ba dữ kiện khiến việc vá client là lựa chọn hợp lý chứ không phải một mẹo lách:
+
+1. **`expo-updates` được biên dịch từ mã nguồn.** 92 file Kotlin trong `node_modules/expo-updates/android/src` được Gradle compile trong lúc build app — không phải AAR dựng sẵn. Nên sửa mã nguồn ở đó có tác dụng thật, và `patch-package` giữ được thay đổi qua mỗi lần `npm install`.
+
+2. **Chốt chặn được chính Expo đánh dấu là tạm thời.** Ngay trên dòng `throw` trong `UpdateFactory.kt`:
+
+   ```kotlin
+   // TODO(wschurman): remove error in a few major releases after SDK 51
+   // when it's unlikely classic updates may erroneously be served
+   ```
+
+   Nó tồn tại để chặn *classic manifest* thời trước SDK 50 bị phục vụ nhầm, không phải vì protocol đòi header đó. Manifest ta sinh ra là manifest v1 thật.
+
+3. **Bản vá là một dòng, ở điểm sạch nhất** — `ResponseHeaderData.kt`, nơi header thô được chuyển thành số:
+
+   ```kotlin
+   val protocolVersion = protocolVersionRaw?.let { Integer.valueOf(it) } ?: 1
+   ```
+
+   Vá ở đây thay vì ở `UpdateFactory.kt` khiến `FileDownloader.kt:457` (nhánh xử lý `204 No Content`) cũng nhận đúng protocol version, thay vì phải vá hai chỗ.
+
+**Chi phí phải chấp nhận, nêu rõ để không ai bất ngờ về sau:**
+
+- Đây là thay đổi trên thư viện bên thứ ba. Phải kiểm tra lại **mỗi lần nâng SDK Expo** — nếu upstream sửa file đó, patch sẽ xung đột và build sẽ báo lỗi.
+- CI bắt buộc chạy `patch-package` (qua script `postinstall`).
+- iOS sau này cần bản vá tương đương bên Swift.
+- Kết luận trung thực của POC là: *hot update qua CDN GitHub thuần chạy được, với điều kiện vá một dòng trong `expo-updates`* — không phải "chạy được nguyên trạng".
+
+Nếu chi phí bảo trì này trở nên phiền, phương án Cloudflare Pages dưới đây đã được kiểm chứng và chuyển sang chỉ tốn một dòng cấu hình `baseUrl`.
+
+#### Phương án dự phòng: Cloudflare Pages làm tầng phục vụ
 
 File vẫn nằm trong GitHub (nhánh `gh-pages` là nguồn sự thật và là nơi lưu lịch sử để rollback). Cloudflare Pages đứng trước làm CDN, và nó hỗ trợ file `_headers` đặt header tùy ý — xác nhận từ tài liệu Cloudflare: cho phép header tùy ý, không giới hạn ở header bảo mật; trần 100 rule, 2000 ký tự mỗi dòng.
 
