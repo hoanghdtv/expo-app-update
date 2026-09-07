@@ -4,6 +4,180 @@
   "platform": "android",
   "releases": [
     {
+      "id": "25d418a9-6ac7-01aa-234e-76b329be0bc4",
+      "createdAt": "2026-09-07T10:29:05.179Z",
+      "gitSha": "0240739d4accd0ab1b1b3a8a8f9176cead428207",
+      "manifest": {
+        "id": "25d418a9-6ac7-01aa-234e-76b329be0bc4",
+        "createdAt": "2026-09-07T10:29:05.179Z",
+        "runtimeVersion": "1.0.0",
+        "launchAsset": {
+          "hash": "nVwZsIn5QEaMhJmlSj7fTHzEFnyWM30IwAx9SSuS7po",
+          "key": "beb0dafdb627895f6a62891dc6f65016",
+          "contentType": "application/javascript",
+          "url": "https://hoanghdtv.github.io/expo-app-update/store/9d5c19b089f940468c8499a54a3edf4c7cc4167c96337d08c00c7d492b92ee9a.js"
+        },
+        "assets": [
+          {
+            "hash": "zeNF0IkwnGW4gbljM6E2wryIJSXWEcqzmwtJgw77Fz4",
+            "key": "ddbb1cd55ad509e82377bd10beed6506",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/cde345d089309c65b881b96333a136c2bc882525d611cab39b0b49830efb173e.ttf"
+          },
+          {
+            "hash": "5Xg6Z_t3JogQzWqEdNgCoLABFAn9Ed1Q4hjZTxntre4",
+            "key": "e1f33daee21eb5998b13d3e05264d9a3",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/e5783a67fb77268810cd6a8474d802a0b0011409fd11dd50e218d94f19edadee.ttf"
+          },
+          {
+            "hash": "tddwZ_WW-IafhWzlk5dchwr2dCHI7ThU6IqGGkfz9CI",
+            "key": "d2994e3dea3856e1834395ad6cce32af",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/b5d77067f596f8869f856ce593975c870af67421c8ed3854e88a861a47f3f422.ttf"
+          },
+          {
+            "hash": "pBS0iqV37yxi67E1NB3e7zPuJqT13J94f5PBqrCOu1A",
+            "key": "51b6ad87261f18b6433ec52871ddfabc",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/a414b48aa577ef2c62ebb135341ddeef33ee26a4f5dc9f787f93c1aab08ebb50.ttf"
+          },
+          {
+            "hash": "8XOFdlJehtsdXPY6bBtW4KfioomLSZrJPblfLnqfnNU",
+            "key": "137ab18bace28dd0bd83eb3b8ed2bc54",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/f1738576525e86db1d5cf63a6c1b56e0a7e2a2898b499ac93db95f2e7a9f9cd5.ttf"
+          },
+          {
+            "hash": "8w6dJXTDvsUUQ0f_ll-YQcjwaFfwtzgwAPjJSJoWGEE",
+            "key": "a5f35888d2da465de352e0dcfaf33324",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/f30e9d2574c3bec5144347ff965f9841c8f06857f0b7383000f8c9489a161841.ttf"
+          },
+          {
+            "hash": "--gly_x0kxf1ehQz05BaqdPziHMv0puOijbzSEXjvD4",
+            "key": "6e237de4f1f413afa2fcc45c77ac343a",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/fbe825cbfc749317f57a1433d3905aa9d3f388732fd29b8e8a36f34845e3bc3e.ttf"
+          },
+          {
+            "hash": "G5-rlv_HvKManUzU1mDM6AuUaVkI7HYTr97OK4z4A8I",
+            "key": "6016034293c084aa0c056e83938bf1cc",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/1b9fab96ffc7bca31a9d4cd4d660cce80b94695908ec7613afdece2b8cf803c2.ttf"
+          },
+          {
+            "hash": "E2F0mWftbfIqMaLzIBU6kxtBVNfjdV0F-5jtdr01y4w",
+            "key": "bcec6eda9700a81ba92c483a2f2c02c1",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/1361749967ed6df22a31a2f320153a931b4154d7e3755d05fb98ed76bd35cb8c.ttf"
+          },
+          {
+            "hash": "6QA6XrbExXr99G_K0Ib1ePdXnmbX6GT_azmyEHt-Jtc",
+            "key": "1b97f7df9b976cfe530c18c09598e6f6",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/e9003a5eb6c4c57afdf46fcad086f578f7579e66d7e864ff6b39b2107b7e26d7.ttf"
+          },
+          {
+            "hash": "glPG3aXrnxg89RpiUa7q52sJgDBfmgHWzX6Slhge_ps",
+            "key": "3d0662838915a7a16d01c262735d3d29",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/8253c6dda5eb9f183cf51a6251aeeae76b0980305f9a01d6cd7e9296181efe9b.ttf"
+          },
+          {
+            "hash": "KhByPcs0vRlSd6ktuFicjAsEBOdnBGh78gN6bATxCEg",
+            "key": "17f8f23a2852bfa14ce5bf590c2a0e2c",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/2a10723dcb34bd195277a92db8589c8c0b0404e76704687bf2037a6c04f10848.ttf"
+          },
+          {
+            "hash": "yMCeS9CN57kBtFYfFs6bsas_-kIM-u-fKkAobhQwDnU",
+            "key": "36cad9f97595b7759264b945d64502b4",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/c8c09e4bd08de7b901b4561f16ce9bb1ab3ffa420cfaef9f2a40286e14300e75.ttf"
+          },
+          {
+            "hash": "TaOlkdpICe9l0P_ACFxQqFlyPFV0qlYIwbcXXS3OM-E",
+            "key": "155406bfbfb023eb104728edfe62c0e9",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/4da3a591da4809ef65d0ffc0085c50a859723c5574aa5608c1b7175d2dce33e1.ttf"
+          },
+          {
+            "hash": "cN7MiEpWQaNRJtxreSYjX4iOdjNpElngB6tF0B8JYyw",
+            "key": "a349d1ac188e1a67689432f44de99849",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/70decc884a5641a35126dc6b7926235f888e7633691259e007ab45d01f09632c.ttf"
+          },
+          {
+            "hash": "vMZVrL0l9E7tSJTzxl-DZQNHbbQRxUDY3VthbvYMGCU",
+            "key": "3398006c80026f0508aaaf4808950d56",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/bcc655acbd25f44eed4894f3c65f836503476db411c540d8dd5b616ef60c1825.ttf"
+          },
+          {
+            "hash": "lSzMxLrfPQ6lrtfhskNCOGksGWuR-UUQ74oicaJUfxM",
+            "key": "7ca909a56537d965feef41abe58b87e0",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/952cccc4badf3d0ea5aed7e1b2434238692c196b91f94510ef8a2271a2547f13.ttf"
+          },
+          {
+            "hash": "m41RpkyAdygCv-FYGJP4QfdI5pnycB0f-IgFwUoUhEg",
+            "key": "d5f78c24de59ce5e4bad405e10e71941",
+            "contentType": "font/ttf",
+            "fileExtension": ".ttf",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/9b8d51a64c80772802bfe1581893f841f748e699f2701d1ff88805c14a148448.ttf"
+          },
+          {
+            "hash": "EZRiu3jrJAplyGn8Bn7lmWObPLWkGVPyXAexfSqMfg8",
+            "key": "cb975bba2216ce10a60e6c0ffe9941a2",
+            "contentType": "image/png",
+            "fileExtension": ".png",
+            "url": "https://hoanghdtv.github.io/expo-app-update/store/119462bb78eb240a65c869fc067ee599639b3cb5a41953f25c07b17d2a8c7e0f.png"
+          }
+        ],
+        "metadata": {},
+        "extra": {
+          "expoClient": {
+            "name": "expo-app-update",
+            "slug": "expo-app-update",
+            "version": "1.0.0",
+            "orientation": "portrait",
+            "android": {
+              "package": "com.hoanghdtv.expoappupdate"
+            },
+            "runtimeVersion": "1.0.0",
+            "updates": {
+              "url": "https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json",
+              "enabled": true,
+              "checkAutomatically": "ON_LOAD",
+              "fallbackToCacheTimeout": 0
+            },
+            "extra": {
+              "updateChannel": "production",
+              "baseUrl": "https://hoanghdtv.github.io/expo-app-update"
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "d1ceb615-49b0-6705-e6bf-258a2d479f8e",
       "createdAt": "2026-09-07T09:59:01.097Z",
       "gitSha": "4c8065d13b7dab686f62b22889c38daafbee56db",
