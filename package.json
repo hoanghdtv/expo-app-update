@@ -28,7 +28,8 @@
     "web": "expo start --web",
     "test:tools": "vitest run tools",
     "export:android": "expo export --platform android && tsx tools/expo-config.ts",
-    "publish:update": "tsx tools/publish.ts"
+    "publish:update": "tsx tools/publish.ts",
+    "rollback:update": "tsx tools/rollback.ts"
   },
   "private": true
 }
