@@ -37,7 +37,7 @@ jobs:
       - run: npm ci
 
       - name: Xác minh bản vá expo-updates đã được áp
-        run: grep -q "?: 1" node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
+        run: 'grep -q "?: 1" node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt'
 
       - name: Áp input vào update.config.json
         run: |
