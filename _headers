@@ -1,0 +1,5 @@
+# expo-updates bắt buộc header này trên mọi response manifest.
+# Thiếu nó, client ném "Legacy manifests are no longer supported"
+# (xem UpdateFactory.kt trong expo-updates).
+/*
+  expo-protocol-version: 1
