@@ -1,12 +1,12 @@
 {
-  "id": "25d418a9-6ac7-01aa-234e-76b329be0bc4",
-  "createdAt": "2026-09-07T10:29:05.179Z",
+  "id": "89ed467c-15c3-1819-dfa7-ff8989ffd39c",
+  "createdAt": "2026-09-07T11:51:40.999Z",
   "runtimeVersion": "1.0.0",
   "launchAsset": {
-    "hash": "nVwZsIn5QEaMhJmlSj7fTHzEFnyWM30IwAx9SSuS7po",
-    "key": "beb0dafdb627895f6a62891dc6f65016",
+    "hash": "M9M43D8yRtfmLIigByKqcUu8Op7xjjCqwjR7kPh6x1M",
+    "key": "75c8ec559b8abaa13e6637e724632b4a",
     "contentType": "application/javascript",
-    "url": "https://hoanghdtv.github.io/expo-app-update/store/9d5c19b089f940468c8499a54a3edf4c7cc4167c96337d08c00c7d492b92ee9a.js"
+    "url": "https://hoanghdtv.github.io/expo-app-update/store/33d338dc3f3246d7e62c88a00722aa714bbc3a9ef18e30aac2347b90f87ac753.js"
   },
   "assets": [
     {
