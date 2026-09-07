@@ -122,9 +122,14 @@ Chạy trong Git Bash:
 
 ```bash
 npx create-expo-app@latest .tmp-scaffold --template blank-typescript --no-install
+
+# create-expo-app tự chạy git init trong thư mục đích. Phải xóa .git đó trước
+# khi di chuyển, nếu không lệnh mv sẽ đụng vào .git của repo hiện tại.
+rm -rf .tmp-scaffold/.git
+
 mv .tmp-scaffold/* .
 mv .tmp-scaffold/.[!.]* . 2>/dev/null || true
-rmdir .tmp-scaffold
+rm -rf .tmp-scaffold
 npm install
 npx expo install expo-updates expo-constants
 npm i -D tsx vitest
@@ -277,13 +282,18 @@ export default function App() {
 }
 ```
 
-- [ ] **Step 9: Tạo repo trên GitHub và push `main`**
+- [ ] **Step 9: Đổi tên nhánh thành `main`, tạo repo trên GitHub và push**
+
+Repo local hiện đang ở nhánh `master`, trong khi cả kế hoạch lẫn GitHub đều dùng `main`. Đổi tên trước — nhánh chưa có remote nên thao tác này hoàn toàn cục bộ và an toàn.
 
 ```bash
+git branch -m master main
 git add -A
 git commit -m "feat: scaffold app Expo với expo-updates"
 gh repo create hoanghdtv/expo-app-update --public --source=. --remote=origin --push
 ```
+
+Xác nhận: `git branch --show-current` in ra `main`.
 
 Xác nhận: `git remote -v` hiển thị `origin`.
 
