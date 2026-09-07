@@ -2,7 +2,7 @@ diff --git a/node_modules/expo-updates/android/src/main/java/expo/modules/update
 index df75ec4..2c20381 100644
 --- a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
 +++ b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
-@@ -31,7 +31,26 @@ data class ResponseHeaderData(
+@@ -31,7 +31,22 @@ data class ResponseHeaderData(
     */
    private val manifestFiltersRaw: String? = null
  ) {
