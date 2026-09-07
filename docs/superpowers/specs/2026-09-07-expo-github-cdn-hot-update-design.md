@@ -57,6 +57,53 @@ Directive (bao gồm `rollBackToEmbedded`) chỉ tồn tại trong response `mul
 
 **Hệ quả:** rollback do server chủ động đẩy về bản embedded là bất khả thi. Hai dạng rollback còn lại vẫn khả dụng và đủ cho yêu cầu (mục 6).
 
+### 2.3b GIỚI HẠN CỨNG 3 — phát hiện khi chạy thật, đã lật ràng buộc "chỉ GitHub"
+
+**Ngày phát hiện: 2026-09-07, trong lúc thực thi Task 5.**
+
+Client `expo-updates` **bắt buộc** phải nhận được response header `expo-protocol-version` trên mọi response manifest. Thiếu nó là ném lỗi ngay lập tức, không có cờ cấu hình nào tắt được.
+
+Bằng chứng từ chính mã nguồn đang cài, `expo-updates/android/.../manifest/UpdateFactory.kt`:
+
+```kotlin
+when (val expoProtocolVersion = responseHeaderData.protocolVersion) {
+  null -> { throw Exception("Legacy manifests are no longer supported") }
+  0, 1 -> { ... }
+}
+```
+
+GitHub Pages trả về đúng hai header và không có cơ chế nào thêm header tùy ý:
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+```
+
+Đã xác nhận không tồn tại đường thuần GitHub: Pages, `raw.githubusercontent`, Releases (`objects.githubusercontent`), jsDelivr — không nơi nào đặt được header tùy chỉnh.
+
+**Đây là sai sót kiểm chứng ở mục 2.1.** Lúc thiết kế đã xác minh phần *thân* response (protocol cho phép `application/json` thay vì `multipart/mixed` — kết luận đó vẫn đúng) nhưng không kiểm tra rằng có một *response header* bắt buộc.
+
+Chỉ `expo-protocol-version` là bắt buộc. `expo-server-defined-headers` và `expo-manifest-filters` đều tùy chọn (kiểu nullable trong `ResponseHeaderData`).
+
+#### Quyết định sửa: Cloudflare Pages làm tầng phục vụ
+
+File vẫn nằm trong GitHub (nhánh `gh-pages` là nguồn sự thật và là nơi lưu lịch sử để rollback). Cloudflare Pages đứng trước làm CDN, và nó hỗ trợ file `_headers` đặt header tùy ý — xác nhận từ tài liệu Cloudflare: cho phép header tùy ý, không giới hạn ở header bảo mật; trần 100 rule, 2000 ký tự mỗi dòng.
+
+`_headers` ở gốc site chỉ cần:
+
+```
+/*
+  expo-protocol-version: 1
+```
+
+Tinh thần "không có logic phía server" của thiết kế được giữ nguyên: Cloudflare Pages là host tĩnh, y hệt GitHub Pages, chỉ khác ở chỗ cho phép khai báo header bằng một file cấu hình. Không viết một dòng code server nào.
+
+Phát hành bằng `wrangler pages deploy site/`, tức tải trực tiếp từ máy hoặc từ CI — không cần cấp quyền OAuth cho Cloudflare truy cập repo GitHub.
+
+**Những gì KHÔNG đổi:** cây thư mục tĩnh, gating theo path, `store/` content-addressed, định dạng manifest, cơ chế rollback, toàn bộ bộ tool publish. Chỉ đổi tên miền gốc trong cấu hình và thêm một file `_headers`.
+
+**Hệ quả với `update.config.json`:** `baseUrl` không còn suy ra được từ `githubUser` + `repoName`, nên nó trở thành một trường khai báo tường minh.
+
 ### 2.4 Cơ chế "không có update mới"
 
 Server động trả `204 No Content`. Host tĩnh luôn trả 200 kèm manifest.
