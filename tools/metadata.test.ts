@@ -15,19 +15,20 @@ const SAMPLE = {
   },
 };
 
-function makeDist(contents: unknown): string {
+function makeDist(contents: unknown): { dir: string; text: string } {
   const dir = mkdtempSync(join(tmpdir(), 'dist-'));
-  writeFileSync(join(dir, 'metadata.json'), JSON.stringify(contents));
-  return dir;
+  const text = JSON.stringify(contents, null, 2) + '\n';
+  writeFileSync(join(dir, 'metadata.json'), text);
+  return { dir, text };
 }
 
 describe('readExportMetadata', () => {
   it('parse được metadata.json và giữ nguyên buffer thô', () => {
-    const dir = makeDist(SAMPLE);
+    const { dir, text } = makeDist(SAMPLE);
     const { raw, parsed } = readExportMetadata(dir);
     expect(parsed.fileMetadata.android.bundle).toBe('_expo/static/js/android/entry-abc123.hbc');
     // buffer thô phải là byte nguyên bản — id của update dẫn xuất từ nó
-    expect(JSON.parse(raw.toString('utf-8'))).toEqual(SAMPLE);
+    expect(raw.toString('utf-8')).toBe(text);
   });
 
   it('báo lỗi rõ ràng khi thiếu metadata.json', () => {
