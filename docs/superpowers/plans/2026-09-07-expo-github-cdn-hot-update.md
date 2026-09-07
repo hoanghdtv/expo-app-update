@@ -1,6 +1,6 @@
 # Hot update Expo qua CDN GitHub — Kế hoạch triển khai
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Xây POC chứng minh app Expo (Android) nhận được hot update — bundle JS, assets, rollback và version gating — với toàn bộ hạ tầng phát hành nằm trên GitHub Pages tĩnh, không dùng EAS Update và không có server nào khác.
 
@@ -9,6 +9,20 @@
 **Tech Stack:** Expo SDK 57, `expo-updates`, React Native, TypeScript, Node 24, `tsx`, `vitest`, GitHub Actions, GitHub Pages.
 
 **Spec:** `docs/superpowers/specs/2026-09-07-expo-github-cdn-hot-update-design.md`
+
+## TRẠNG THÁI: HOÀN THÀNH — 2026-09-07
+
+Cả 10 task và 5/5 kịch bản E2E đã chạy xong và được xác minh trên thiết bị (Android emulator API 36, bản build `release`). Checkbox bên dưới đã đánh dấu hết.
+
+**Những chỗ thực thi khác kế hoạch, ghi lại để không ai tưởng là thiếu sót:**
+
+- **Task 7, tiền đề:** máy test là bản cài mới, bundle embedded có `createdAt` mới hơn manifest đang phục vụ nên app báo `available=false`. Phải publish thêm một bản lành (`v4`, id `89ed467c`) trước để có "bản OTA trước đó" cho L1 quay về.
+- **Task 7 Step 6:** khôi phục bản lành bằng chính rollback L2 (gộp với Task 8 Step 6) thay vì export và publish một bundle mới — cùng kết quả, mà lại là bằng chứng cho E2E #4 luôn.
+- **Task 9:** mỗi bản publish "lạc chỗ" dùng banner khác tên và khác màu (`v5` xanh cho `2.0.0`, `v6` cam cho `staging`), để nếu gating rò rỉ thì phát hiện bằng mắt chứ không chỉ dựa vào một chữ `available=false`.
+- **Task 9 Step 3:** URL trong kế hoạch là `expo-app-update.pages.dev` (dấu vết giai đoạn Cloudflare đã bị lật lại). Đã dùng `hoanghdtv.github.io`.
+
+**Kết quả kiểm chứng:** [`docs/rollback-notes.md`](../../rollback-notes.md) và [`docs/gating-notes.md`](../../gating-notes.md).
+
 
 ## Môi trường đã xác minh
 
@@ -105,7 +119,7 @@ Ranh giới: `hashing`/`manifest`/`releases`/`config` là hàm thuần, test đ�
   - `update.config.json` với các khóa `githubUser`, `repoName`, `channel`, `runtimeVersion`, `platform`
   - `src/version.ts` export `BANNER_TEXT: string` và `BANNER_COLOR: string`
 
-- [ ] **Step 1: Set `ANDROID_HOME`**
+- [x] **Step 1: Set `ANDROID_HOME`**
 
 Chưa được set trên máy này; `expo run:android` sẽ thất bại nếu thiếu.
 
@@ -130,7 +144,7 @@ adb devices
 
 Kỳ vọng: thấy `R3CM80Z2SDD	device`.
 
-- [ ] **Step 2: Tạo app Expo vào thư mục tạm rồi chuyển lên gốc**
+- [x] **Step 2: Tạo app Expo vào thư mục tạm rồi chuyển lên gốc**
 
 Thư mục gốc đã có `docs/` và `.git/`, mà `create-expo-app` từ chối chạy trong thư mục không rỗng. Nên scaffold vào thư mục tạm rồi chuyển lên.
 
@@ -153,7 +167,7 @@ npm i -D tsx vitest
 
 Xác nhận: `ls assets/*.png` liệt kê ít nhất hai file PNG (Task 6 cần hai ảnh khác nhau). Ghi lại tên chúng.
 
-- [ ] **Step 3: Viết `update.config.json`**
+- [x] **Step 3: Viết `update.config.json`**
 
 ```json
 {
@@ -167,7 +181,7 @@ Xác nhận: `ls assets/*.png` liệt kê ít nhất hai file PNG (Task 6 cần 
 
 Đây là nguồn sự thật duy nhất. Đổi channel hay runtimeVersion nghĩa là sửa file này — không có biến môi trường nào cả.
 
-- [ ] **Step 4: Viết `app.config.js`**
+- [x] **Step 4: Viết `app.config.js`**
 
 Xóa `app.json` mà template sinh ra, thay bằng file này.
 
@@ -200,7 +214,7 @@ module.exports = {
 
 `runtimeVersion` cố ý là chuỗi lấy từ file, không dùng policy `appVersion` — kịch bản gating ở Task 9 cần đổi giá trị này có kiểm soát.
 
-- [ ] **Step 5: Viết `.gitignore`**
+- [x] **Step 5: Viết `.gitignore`**
 
 ```
 node_modules/
@@ -216,14 +230,14 @@ ios/
 
 `site/` bắt buộc phải có: từ Task 5 nó là một git worktree của nhánh `gh-pages`, không được để nhánh `main` theo dõi. `android/` cũng bỏ qua vì được sinh lại từ `app.config.js` mỗi lần prebuild.
 
-- [ ] **Step 6: Viết `src/version.ts`**
+- [x] **Step 6: Viết `src/version.ts`**
 
 ```ts
 export const BANNER_TEXT = 'v1 — EMBEDDED';
 export const BANNER_COLOR = '#1e3a8a';
 ```
 
-- [ ] **Step 7: Viết `src/UpdatePanel.tsx`**
+- [x] **Step 7: Viết `src/UpdatePanel.tsx`**
 
 `Updates.channel` **luôn `undefined`** với custom server — nó chỉ được điền khi dùng EAS Update. Channel đọc từ `expo-constants`.
 
@@ -288,7 +302,7 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 8: Viết `App.tsx`**
+- [x] **Step 8: Viết `App.tsx`**
 
 ```tsx
 import UpdatePanel from './src/UpdatePanel';
@@ -298,7 +312,7 @@ export default function App() {
 }
 ```
 
-- [ ] **Step 9: Đổi tên nhánh thành `main`, tạo repo trên GitHub và push**
+- [x] **Step 9: Đổi tên nhánh thành `main`, tạo repo trên GitHub và push**
 
 Repo local hiện đang ở nhánh `master`, trong khi cả kế hoạch lẫn GitHub đều dùng `main`. Đổi tên trước — nhánh chưa có remote nên thao tác này hoàn toàn cục bộ và an toàn.
 
@@ -313,7 +327,7 @@ Xác nhận: `git branch --show-current` in ra `main`.
 
 Xác nhận: `git remote -v` hiển thị `origin`.
 
-- [ ] **Step 10: Tạo nhánh `gh-pages` và bật GitHub Pages**
+- [x] **Step 10: Tạo nhánh `gh-pages` và bật GitHub Pages**
 
 Cần một file PNG thật để kiểm tra Content-Type, nên copy một icon ra ngoài repo trước khi chuyển nhánh. Chạy trong Git Bash:
 
@@ -343,7 +357,7 @@ gh api -X POST repos/hoanghdtv/expo-app-update/pages \
 
 Nếu trả về lỗi `409 Conflict` nghĩa là Pages đã bật rồi — bỏ qua, đi tiếp.
 
-- [ ] **Step 11: XÁC MINH HOSTING — CỔNG CHẶN RỦI RO**
+- [x] **Step 11: XÁC MINH HOSTING — CỔNG CHẶN RỦI RO**
 
 Chờ Pages deploy (~1–2 phút). Kiểm tra tiến độ:
 
@@ -362,7 +376,7 @@ Kỳ vọng: cả hai trả `HTTP/2 200`. `hello.js` có `content-type: applicat
 
 Nếu nhận 404: gần như chắc chắn thiếu `.nojekyll` hoặc Pages chưa deploy xong. **Không đi tiếp cho tới khi cả hai trả 200** — toàn bộ thiết kế phụ thuộc vào điều này.
 
-- [ ] **Step 12: Build release và chạy trên máy Android**
+- [x] **Step 12: Build release và chạy trên máy Android**
 
 ```bash
 npx expo run:android --variant release
@@ -372,7 +386,7 @@ Bản debug bỏ qua `expo-updates` hoàn toàn — bắt buộc release. Bản 
 
 Kỳ vọng: app chạy trên máy `R3CM80Z2SDD`, banner ghi `v1 — EMBEDDED`, `isEmbeddedLaunch: true`, `channel (từ extra): production`.
 
-- [ ] **Step 13: Commit**
+- [x] **Step 13: Commit**
 
 ```bash
 git add -A
@@ -397,7 +411,7 @@ git push
   - `md5Hex(buf: Buffer): string`
   - `uuidFromSha256Hex(hex: string): string`
 
-- [ ] **Step 1: Thêm script test vào `package.json`**
+- [x] **Step 1: Thêm script test vào `package.json`**
 
 ```json
 "scripts": {
@@ -405,7 +419,7 @@ git push
 }
 ```
 
-- [ ] **Step 2: Viết test thất bại**
+- [x] **Step 2: Viết test thất bại**
 
 `tools/hashing.test.ts`:
 
@@ -456,7 +470,7 @@ describe('uuidFromSha256Hex', () => {
 
 Ca kiểm tra `+` và `/` là chủ ý: `sha256("abc")` chứa cả hai ký tự đó ở dạng base64 chuẩn, nên nó bắt được đúng lỗi encoding mà spec mục 9 cảnh báo.
 
-- [ ] **Step 3: Chạy test, xác nhận thất bại**
+- [x] **Step 3: Chạy test, xác nhận thất bại**
 
 ```bash
 npm run test:tools
@@ -464,7 +478,7 @@ npm run test:tools
 
 Kỳ vọng: FAIL — `Cannot find module './hashing'`.
 
-- [ ] **Step 4: Viết `tools/hashing.ts`**
+- [x] **Step 4: Viết `tools/hashing.ts`**
 
 ```ts
 import { createHash } from 'node:crypto';
@@ -493,7 +507,7 @@ export function uuidFromSha256Hex(hex: string): string {
 }
 ```
 
-- [ ] **Step 5: Chạy test, xác nhận pass**
+- [x] **Step 5: Chạy test, xác nhận pass**
 
 ```bash
 npm run test:tools
@@ -501,7 +515,7 @@ npm run test:tools
 
 Kỳ vọng: PASS, 6 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tools/hashing.ts tools/hashing.test.ts package.json
@@ -525,7 +539,7 @@ git commit -m "feat(tools): hàm băm và sinh UUID cho manifest"
   - `readExportMetadata(distDir: string): { raw: Buffer; parsed: ExportMetadata }`
   - `selectPlatform(parsed: ExportMetadata, platform: string): PlatformMetadata`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 `tools/metadata.test.ts`:
 
@@ -581,7 +595,7 @@ describe('selectPlatform', () => {
 
 Test đầu khẳng định `raw` là byte nguyên bản chứ không phải kết quả re-serialize — quan trọng, vì `id` của update dẫn xuất từ hash của buffer này và phải ổn định.
 
-- [ ] **Step 2: Chạy test, xác nhận thất bại**
+- [x] **Step 2: Chạy test, xác nhận thất bại**
 
 ```bash
 npm run test:tools
@@ -589,7 +603,7 @@ npm run test:tools
 
 Kỳ vọng: FAIL — không tìm thấy `./metadata`.
 
-- [ ] **Step 3: Viết `tools/metadata.ts`**
+- [x] **Step 3: Viết `tools/metadata.ts`**
 
 ```ts
 import { existsSync, readFileSync } from 'node:fs';
@@ -622,7 +636,7 @@ export function selectPlatform(parsed: ExportMetadata, platform: string): Platfo
 }
 ```
 
-- [ ] **Step 4: Chạy test, xác nhận pass**
+- [x] **Step 4: Chạy test, xác nhận pass**
 
 ```bash
 npm run test:tools
@@ -630,7 +644,7 @@ npm run test:tools
 
 Kỳ vọng: PASS, 10 test (6 từ Task 2 + 4 mới).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tools/metadata.ts tools/metadata.test.ts
@@ -657,7 +671,7 @@ git commit -m "feat(tools): đọc metadata.json của expo export"
   - `storeUrl(baseUrl: string, stored: StoredFile): string`
   - `buildManifest(input: { id: string; createdAt: string; runtimeVersion: string; baseUrl: string; launch: StoredFile; assets: StoredFile[]; expoClient: unknown }): UpdateManifest`
 
-- [ ] **Step 1: Viết test thất bại cho store**
+- [x] **Step 1: Viết test thất bại cho store**
 
 `tools/store.test.ts`:
 
@@ -711,7 +725,7 @@ describe('storeFile', () => {
 });
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận thất bại**
+- [x] **Step 2: Chạy test, xác nhận thất bại**
 
 ```bash
 npm run test:tools
@@ -719,7 +733,7 @@ npm run test:tools
 
 Kỳ vọng: FAIL — không tìm thấy `./store`.
 
-- [ ] **Step 3: Viết `tools/store.ts`**
+- [x] **Step 3: Viết `tools/store.ts`**
 
 ```ts
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -759,7 +773,7 @@ export function storeFile(opts: { sourcePath: string; ext: string; siteDir: stri
 }
 ```
 
-- [ ] **Step 4: Viết test thất bại cho manifest**
+- [x] **Step 4: Viết test thất bại cho manifest**
 
 `tools/manifest.test.ts`:
 
@@ -834,7 +848,7 @@ describe('buildManifest', () => {
 });
 ```
 
-- [ ] **Step 5: Chạy test, xác nhận thất bại**
+- [x] **Step 5: Chạy test, xác nhận thất bại**
 
 ```bash
 npm run test:tools
@@ -842,7 +856,7 @@ npm run test:tools
 
 Kỳ vọng: store PASS, manifest FAIL — không tìm thấy `./manifest`.
 
-- [ ] **Step 6: Viết `tools/manifest.ts`**
+- [x] **Step 6: Viết `tools/manifest.ts`**
 
 ```ts
 import type { StoredFile } from './store';
@@ -918,7 +932,7 @@ export function buildManifest(input: {
 }
 ```
 
-- [ ] **Step 7: Chạy test, xác nhận pass**
+- [x] **Step 7: Chạy test, xác nhận pass**
 
 ```bash
 npm run test:tools
@@ -926,7 +940,7 @@ npm run test:tools
 
 Kỳ vọng: PASS, 21 test.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add tools/store.ts tools/store.test.ts tools/manifest.ts tools/manifest.test.ts
@@ -961,7 +975,7 @@ Task đầu tiên chứng minh vòng lặp hot update chạy thật.
   - `appendRelease(file: ReleasesFile, entry: ReleaseEntry): ReleasesFile`
   - `findRelease(file: ReleasesFile, id: string): ReleaseEntry`
 
-- [ ] **Step 1: Viết test thất bại cho config và releases**
+- [x] **Step 1: Viết test thất bại cho config và releases**
 
 `tools/config.test.ts`:
 
@@ -1047,7 +1061,7 @@ describe('findRelease', () => {
 });
 ```
 
-- [ ] **Step 2: Chạy test, xác nhận thất bại**
+- [x] **Step 2: Chạy test, xác nhận thất bại**
 
 ```bash
 npm run test:tools
@@ -1055,7 +1069,7 @@ npm run test:tools
 
 Kỳ vọng: FAIL — không tìm thấy `./config` và `./releases`.
 
-- [ ] **Step 3: Viết `tools/config.ts`**
+- [x] **Step 3: Viết `tools/config.ts`**
 
 ```ts
 import { existsSync, readFileSync } from 'node:fs';
@@ -1110,7 +1124,7 @@ export function releasesPathFor(cfg: PublishConfig): string {
 }
 ```
 
-- [ ] **Step 4: Viết `tools/releases.ts`**
+- [x] **Step 4: Viết `tools/releases.ts`**
 
 ```ts
 import { existsSync, readFileSync } from 'node:fs';
@@ -1155,7 +1169,7 @@ export function findRelease(file: ReleasesFile, id: string): ReleaseEntry {
 
 Lưu **toàn bộ manifest** trong mỗi entry là chủ ý: rollback dựng lại được bản cũ mà không cần suy luận hay build lại gì cả.
 
-- [ ] **Step 5: Chạy test, xác nhận pass**
+- [x] **Step 5: Chạy test, xác nhận pass**
 
 ```bash
 npm run test:tools
@@ -1163,7 +1177,7 @@ npm run test:tools
 
 Kỳ vọng: PASS, 30 test.
 
-- [ ] **Step 6: Viết `tools/io.ts`**
+- [x] **Step 6: Viết `tools/io.ts`**
 
 Dùng chung cho `publish.ts`, `rollback.ts` và `expo-config.ts`.
 
@@ -1187,7 +1201,7 @@ export function gitSha(): string {
 }
 ```
 
-- [ ] **Step 7: Viết `tools/expo-config.ts`**
+- [x] **Step 7: Viết `tools/expo-config.ts`**
 
 `expo export` **không** sinh `expoConfig.json`, mà `manifest.extra.expoClient` lại cần nội dung đó. Sinh nó bằng script riêng thay vì chuyển hướng stdout của `expo config` — CLI có thể in log lẫn vào JSON.
 
@@ -1215,7 +1229,7 @@ async function main(): Promise<void> {
 main();
 ```
 
-- [ ] **Step 8: Viết `tools/publish.ts`**
+- [x] **Step 8: Viết `tools/publish.ts`**
 
 ```ts
 import { readFileSync } from 'node:fs';
@@ -1283,7 +1297,7 @@ function main(): void {
 main();
 ```
 
-- [ ] **Step 9: Thêm script vào `package.json`**
+- [x] **Step 9: Thêm script vào `package.json`**
 
 ```json
 "scripts": {
@@ -1293,7 +1307,7 @@ main();
 }
 ```
 
-- [ ] **Step 10: Chạy export và xác nhận đầu vào đúng như mong đợi**
+- [x] **Step 10: Chạy export và xác nhận đầu vào đúng như mong đợi**
 
 ```bash
 npm run export:android
@@ -1303,7 +1317,7 @@ cat dist/expoConfig.json
 
 Kỳ vọng: `metadata.json` có `fileMetadata.android.bundle` (đường dẫn kết thúc bằng `.hbc`) và mảng `assets` gồm các mục `{ path, ext }`. `expoConfig.json` là object JSON có `name`, `slug` và `extra.updateChannel`.
 
-- [ ] **Step 11: Tạo worktree `site/` và publish lần đầu**
+- [x] **Step 11: Tạo worktree `site/` và publish lần đầu**
 
 ```bash
 git worktree add site gh-pages
@@ -1317,7 +1331,7 @@ cd ..
 
 Dùng `git worktree` để `site/` là checkout thật của `gh-pages`, nên `store/` giữ nguyên file cũ giữa các lần publish — đúng yêu cầu merge-không-replace ở spec mục 4.1.
 
-- [ ] **Step 12: Xác minh manifest phục vụ được**
+- [x] **Step 12: Xác minh manifest phục vụ được**
 
 ```bash
 curl -s https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json
@@ -1325,7 +1339,7 @@ curl -s https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/man
 
 Kỳ vọng: JSON manifest, `id` đúng dạng UUID, `launchAsset.url` trỏ vào `/store/`.
 
-- [ ] **Step 13: KỊCH BẢN E2E #1 — update JS**
+- [x] **Step 13: KỊCH BẢN E2E #1 — update JS**
 
 1. Sửa `src/version.ts`: `BANNER_TEXT = 'v2 — OTA'`, `BANNER_COLOR = '#166534'`
 2. `npm run export:android`
@@ -1340,7 +1354,7 @@ Kỳ vọng: banner đổi thành `v2 — OTA` màu xanh lá, `isEmbeddedLaunch:
 
 Nếu app báo `checkError`: kiểm tra bản build là release chứ không phải debug, và `EXPO_UPDATE_URL` trong `android/app/src/main/AndroidManifest.xml` trỏ đúng.
 
-- [ ] **Step 14: Commit**
+- [x] **Step 14: Commit**
 
 ```bash
 git add tools/ package.json src/version.ts
@@ -1360,7 +1374,7 @@ git push
 - Consumes: `storeFile`, `buildManifest` (không đổi)
 - Produces: không có interface mới — task này chứng minh đường dẫn asset đã hoạt động
 
-- [ ] **Step 1: Thêm font và ảnh**
+- [x] **Step 1: Thêm font và ảnh**
 
 ```bash
 npx expo install expo-font @expo-google-fonts/inter
@@ -1370,7 +1384,7 @@ cp assets/icon.png assets/demo/photo.png
 
 Dùng luôn icon mà template sinh ra làm ảnh demo. Nếu `assets/icon.png` không tồn tại, dùng tên file đã ghi lại ở Task 1 Step 2 — cần hai file PNG khác nhau rõ rệt: một cho bước này, một cho Step 5.
 
-- [ ] **Step 2: Hiển thị ảnh và font trong `src/UpdatePanel.tsx`**
+- [x] **Step 2: Hiển thị ảnh và font trong `src/UpdatePanel.tsx`**
 
 Thêm import (`useFonts` lấy từ `expo-font`, không lấy từ package font — tránh phụ thuộc vào việc package có re-export hay không):
 
@@ -1402,7 +1416,7 @@ demo: { width: 160, height: 160, alignSelf: 'center', marginBottom: 12 },
 fontDemo: { fontFamily: 'Inter_700Bold', fontSize: 18, marginBottom: 12 },
 ```
 
-- [ ] **Step 3: Publish bản có assets**
+- [x] **Step 3: Publish bản có assets**
 
 ```bash
 npm run export:android
@@ -1410,7 +1424,7 @@ npm run publish:update
 cd site && git add -A && git commit -m "publish: them assets" && git push && cd ..
 ```
 
-- [ ] **Step 4: Xác nhận assets nằm trong manifest và tải được**
+- [x] **Step 4: Xác nhận assets nằm trong manifest và tải được**
 
 ```bash
 curl -s https://expo-app-update.pages.dev/production/1.0.0/android/manifest.json
@@ -1424,7 +1438,7 @@ curl -I <url-vừa-chọn>
 
 Kỳ vọng: `HTTP/2 200`. Đây là chỗ rủi ro của spec mục 9 — nếu ra 404 thì dừng lại, kiểm tra `.nojekyll` và xem file đã được commit lên `gh-pages` chưa.
 
-- [ ] **Step 5: KỊCH BẢN E2E #2 — update asset**
+- [x] **Step 5: KỊCH BẢN E2E #2 — update asset**
 
 1. Trên app: check → fetch → restart. Xác nhận ảnh và font mới xuất hiện.
 2. Thay bằng ảnh khác hẳn: `cp assets/splash-icon.png assets/demo/photo.png` (hoặc file PNG thứ hai đã chọn ở Step 1).
@@ -1433,7 +1447,7 @@ Kỳ vọng: `HTTP/2 200`. Đây là chỗ rủi ro của spec mục 9 — nếu
 
 Kỳ vọng: ảnh đổi sang ảnh mới. Đây là bằng chứng asset thực sự được cập nhật qua OTA chứ không phải chỉ có JS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add assets/ src/UpdatePanel.tsx package.json package-lock.json
@@ -1455,11 +1469,11 @@ Lớp L1 của spec mục 6. Không viết code — task này xác minh `expo-up
 - Consumes: pipeline publish của Task 5
 - Produces: không có
 
-- [ ] **Step 1: Ghi lại trạng thái hiện tại**
+- [x] **Step 1: Ghi lại trạng thái hiện tại**
 
 Mở app, ghi lại `updateId` đang chạy. Đây là bản mà app phải quay về.
 
-- [ ] **Step 2: Tạo bundle crash ngay lúc khởi động**
+- [x] **Step 2: Tạo bundle crash ngay lúc khởi động**
 
 Thêm vào **đầu** `src/version.ts`, ở cấp module (không nằm trong hàm nào):
 
@@ -1469,7 +1483,7 @@ throw new Error('CRASH CO Y — kiem tra rollback tu dong');
 
 Phải ở cấp module thì lỗi mới xảy ra trong lúc nạp bundle, tức là lúc `expo-updates` còn đang theo dõi và có thể can thiệp.
 
-- [ ] **Step 3: Publish bản hỏng**
+- [x] **Step 3: Publish bản hỏng**
 
 ```bash
 npm run export:android
@@ -1477,7 +1491,7 @@ npm run publish:update
 cd site && git add -A && git commit -m "publish: bundle hong co y" && git push && cd ..
 ```
 
-- [ ] **Step 4: KỊCH BẢN E2E #3 — rollback tự động**
+- [x] **Step 4: KỊCH BẢN E2E #3 — rollback tự động**
 
 1. Trên app: check → fetch → restart
 2. App sẽ crash hoặc chớp màn hình lỗi
@@ -1485,11 +1499,11 @@ cd site && git add -A && git commit -m "publish: bundle hong co y" && git push &
 
 Kỳ vọng: app chạy lại được bằng bản **trước** đó (hoặc bản embedded). `isEmergencyLaunch` có thể là `true`. `updateId` **không phải** id của bản hỏng.
 
-- [ ] **Step 5: Ghi lại quan sát vào `docs/rollback-notes.md`**
+- [x] **Step 5: Ghi lại quan sát vào `docs/rollback-notes.md`**
 
 Ghi rõ: id bản hỏng, id bản app quay về, giá trị `isEmbeddedLaunch` và `isEmergencyLaunch` quan sát được. Hành vi chính xác (quay về bản trước hay về embedded) phụ thuộc trạng thái cache trên máy, và biết chắc điều này là cần thiết để diễn giải kết quả Task 8 và 9.
 
-- [ ] **Step 6: Hoàn nguyên và publish bản lành**
+- [x] **Step 6: Hoàn nguyên và publish bản lành**
 
 ```bash
 # xóa dòng throw khỏi src/version.ts
@@ -1500,7 +1514,7 @@ cd site && git add -A && git commit -m "publish: khoi phuc bundle lanh" && git p
 
 Xác nhận trên app: check → fetch → restart, app chạy bình thường trở lại.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/version.ts docs/rollback-notes.md
@@ -1523,7 +1537,7 @@ Lớp L2 của spec mục 6.
 - Consumes: `findRelease`, `appendRelease`, `readReleases`, `readConfig`, `UpdateManifest`, `uuidFromSha256Hex`, `sha256Hex`, `writeJson`, `gitSha`
 - Produces: `rollbackManifest(source: UpdateManifest, createdAt: string): UpdateManifest`
 
-- [ ] **Step 1: Viết test thất bại**
+- [x] **Step 1: Viết test thất bại**
 
 `tools/rollback.test.ts`:
 
@@ -1567,7 +1581,7 @@ describe('rollbackManifest', () => {
 
 Test thứ hai là hạt nhân của spec mục 4.4 — phát lại manifest cũ nguyên xi thì rollback không có tác dụng.
 
-- [ ] **Step 2: Chạy test, xác nhận thất bại**
+- [x] **Step 2: Chạy test, xác nhận thất bại**
 
 ```bash
 npm run test:tools
@@ -1575,7 +1589,7 @@ npm run test:tools
 
 Kỳ vọng: FAIL — không tìm thấy `./rollback`.
 
-- [ ] **Step 3: Viết `tools/rollback.ts`**
+- [x] **Step 3: Viết `tools/rollback.ts`**
 
 Id đích nhận qua **tham số dòng lệnh**, không qua biến môi trường — chạy giống nhau trên mọi shell.
 
@@ -1635,7 +1649,7 @@ if (process.env.VITEST === undefined) {
 }
 ```
 
-- [ ] **Step 4: Chạy test, xác nhận pass**
+- [x] **Step 4: Chạy test, xác nhận pass**
 
 ```bash
 npm run test:tools
@@ -1643,13 +1657,13 @@ npm run test:tools
 
 Kỳ vọng: PASS, 34 test.
 
-- [ ] **Step 5: Thêm script rollback vào `package.json`**
+- [x] **Step 5: Thêm script rollback vào `package.json`**
 
 ```json
 "rollback:update": "tsx tools/rollback.ts"
 ```
 
-- [ ] **Step 6: KỊCH BẢN E2E #4 — rollback thủ công**
+- [x] **Step 6: KỊCH BẢN E2E #4 — rollback thủ công**
 
 1. Đồng bộ worktree và xem danh sách bản đã phát hành:
 
@@ -1671,7 +1685,7 @@ Dấu `--` là bắt buộc để npm chuyển tham số xuống script.
 
 Kỳ vọng: app hiện lại nội dung của bản cũ (banner và ảnh của bản đó), nhưng `updateId` là một UUID **mới** chứ không phải id cũ. Đây chính là điểm "phát hành lại như update mới" ở spec mục 4.4.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add tools/rollback.ts tools/rollback.test.ts package.json
@@ -1691,13 +1705,13 @@ git push
 - Consumes: `readConfig`, `manifestPathFor`
 - Produces: không có
 
-- [ ] **Step 1: Đưa app về trạng thái "không còn update nào chờ"**
+- [x] **Step 1: Đưa app về trạng thái "không còn update nào chờ"**
 
 Trước khi kiểm tra gating, app phải đã áp dụng bản mới nhất của channel `production` / runtimeVersion `1.0.0`. Nếu không, kết quả `available=true` sẽ đến từ bản còn tồn đọng chứ không phải từ bản gating, và phép thử trở nên vô nghĩa.
 
 Trên app: check → fetch → restart, lặp cho tới khi **Kiểm tra update** cho `available=false`.
 
-- [ ] **Step 2: Publish vào một runtimeVersion khác**
+- [x] **Step 2: Publish vào một runtimeVersion khác**
 
 Sửa `update.config.json`, đổi `"runtimeVersion": "1.0.0"` thành `"2.0.0"`, rồi:
 
@@ -1707,7 +1721,7 @@ npm run publish:update
 cd site && git add -A && git commit -m "publish: runtimeVersion 2.0.0" && git push && cd ..
 ```
 
-- [ ] **Step 3: Xác nhận hai manifest tồn tại ở hai đường dẫn riêng**
+- [x] **Step 3: Xác nhận hai manifest tồn tại ở hai đường dẫn riêng**
 
 ```bash
 curl -sI https://expo-app-update.pages.dev/production/2.0.0/android/manifest.json
@@ -1716,7 +1730,7 @@ curl -sI https://expo-app-update.pages.dev/production/1.0.0/android/manifest.jso
 
 Kỳ vọng: cả hai trả 200.
 
-- [ ] **Step 4: KỊCH BẢN E2E #5a — version gating**
+- [x] **Step 4: KỊCH BẢN E2E #5a — version gating**
 
 App đang chạy được build ở Task 1 với `runtimeVersion` `1.0.0`, nên URL của nó trỏ tới `.../1.0.0/android/manifest.json`. Bản build native **không** đổi theo `update.config.json` — chỉ bản build mới mới đọc giá trị mới.
 
@@ -1724,7 +1738,7 @@ Trên app: bấm **Kiểm tra update**.
 
 Kỳ vọng: `available=false`. App **không** nhìn thấy bản `2.0.0` vì nó không có đường nào để nhìn tới đường dẫn đó. Đây là bằng chứng gating theo path hoạt động (spec mục 3.2, quyết định B).
 
-- [ ] **Step 5: KỊCH BẢN E2E #5b — channel gating**
+- [x] **Step 5: KỊCH BẢN E2E #5b — channel gating**
 
 Sửa `update.config.json`: đưa `runtimeVersion` về `"1.0.0"` và đổi `"channel"` thành `"staging"`, rồi:
 
@@ -1738,15 +1752,15 @@ Trên app (được build ở channel `production`): bấm **Kiểm tra update**
 
 Kỳ vọng: `available=false`.
 
-- [ ] **Step 6: Hoàn nguyên `update.config.json`**
+- [x] **Step 6: Hoàn nguyên `update.config.json`**
 
 Đưa về `"channel": "production"` và `"runtimeVersion": "1.0.0"`. Xác nhận bằng cách so với nội dung ở Task 1 Step 3 — phải giống hệt.
 
-- [ ] **Step 7: Ghi kết quả vào `docs/gating-notes.md`**
+- [x] **Step 7: Ghi kết quả vào `docs/gating-notes.md`**
 
 Ghi rõ hai kịch bản, URL manifest cụ thể đã dùng, và kết quả `available` quan sát được ở mỗi kịch bản.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add update.config.json docs/gating-notes.md
@@ -1765,7 +1779,7 @@ git push
 - Consumes: `tools/publish.ts`, `tools/rollback.ts` qua npm script
 - Produces: không có
 
-- [ ] **Step 1: Viết `.github/workflows/publish.yml`**
+- [x] **Step 1: Viết `.github/workflows/publish.yml`**
 
 CI ghi đè `update.config.json` từ input trước khi chạy, giữ đúng nguyên tắc "một nguồn sự thật".
 
@@ -1834,7 +1848,7 @@ jobs:
 
 Hai lần `actions/checkout` là chủ ý: `site/` phải là checkout thật của `gh-pages` để `store/` giữ lại toàn bộ file cũ. Đây là yêu cầu merge-không-replace ở spec mục 4.1 — thay bằng action publish kiểu "xóa và thay toàn bộ" sẽ làm hỏng rollback.
 
-- [ ] **Step 2: Viết `.github/workflows/rollback.yml`**
+- [x] **Step 2: Viết `.github/workflows/rollback.yml`**
 
 ```yaml
 name: Rollback update
@@ -1900,7 +1914,7 @@ jobs:
           git push
 ```
 
-- [ ] **Step 3: Chạy thử workflow publish**
+- [x] **Step 3: Chạy thử workflow publish**
 
 ```bash
 git add .github/
@@ -1912,7 +1926,7 @@ gh run watch
 
 Kỳ vọng: job xanh, có commit mới trên `gh-pages`. Trên app: check → fetch → restart, nhận được update.
 
-- [ ] **Step 4: Viết `README.md`**
+- [x] **Step 4: Viết `README.md`**
 
 Nội dung bắt buộc có:
 
@@ -1924,7 +1938,7 @@ Nội dung bắt buộc có:
 - **Độ trễ CDN ~10 phút** của `manifest.json` trên GitHub Pages — đúng như thiết kế, không phải lỗi
 - Những gì cố ý không hỗ trợ: iOS, code signing, directive `rollBackToEmbedded`, đổi channel lúc runtime (kèm lý do: xung đột với rollback tự động)
 
-- [ ] **Step 5: Chạy toàn bộ test lần cuối**
+- [x] **Step 5: Chạy toàn bộ test lần cuối**
 
 ```bash
 npm run test:tools
@@ -1932,7 +1946,7 @@ npm run test:tools
 
 Kỳ vọng: PASS, 34 test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add README.md

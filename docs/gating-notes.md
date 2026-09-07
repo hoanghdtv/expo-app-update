@@ -56,6 +56,8 @@ staging/1.0.0      HTTP 200   id 512944a1   rv 1.0.0
 
 Cả ba đều phục vụ được, ba `id` khác nhau. Nói cách khác `available=false` **không phải** vì bản mới chưa lên — nó lên rồi, chỉ là app không có đường tới.
 
+> **Lưu ý:** sau khi xác minh xong, hai đường dẫn `production/2.0.0/` và `staging/1.0.0/` đã được **xóa khỏi `gh-pages`** (commit `94eebdf`) để không ai tưởng dự án đang có runtimeVersion 2.0.0 hay channel staging thật. Chạy lại lệnh `curl` ở trên bây giờ sẽ ra `404` cho hai path đó — đúng như mong đợi, không phải hồi quy. Hai bundle tương ứng vẫn nằm nguyên trong `store/` vì thiết kế cấm xóa nội dung khỏi store (spec mục 4.1).
+
 ## Store dùng chung — đo được, không phải suy đoán
 
 Mỗi lần publish sang path mới chỉ thêm **đúng một file** vào `store/`:

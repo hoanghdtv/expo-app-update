@@ -29,6 +29,14 @@ Cả `app.config.js` (native build) lẫn toàn bộ `tools/` (publish, rollback
 
 Đổi `channel`/`runtimeVersion` trong `update.config.json` rồi build lại native (`app.config.js` nhúng URL manifest vào bản build) là cách duy nhất đổi channel — xem thêm mục 10 vì sao không hỗ trợ đổi lúc runtime.
 
+**Cảnh báo vận hành:** sửa file này chỉ đổi *nơi publish tới*, không tác động gì tới app đã cài. Publish nhầm channel hoặc nhầm runtimeVersion là một **lỗi hoàn toàn im lặng** — CI chạy xanh, file lên đúng chỗ nó được bảo, chỉ là không thiết bị nào nhận được. Sau mỗi lần publish, kiểm tra lại `id` tại chính đường dẫn mà bản build đang hỏi:
+
+```bash
+curl -sS https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json | grep -o '"id":"[^"]*"'
+```
+
+Bằng chứng gating hoạt động (đã kiểm chứng trên thiết bị) nằm ở [`docs/gating-notes.md`](docs/gating-notes.md).
+
 ## 3. Bản vá `expo-updates` — đọc kỹ mục này
 
 ### Vì sao cần vá
@@ -100,7 +108,16 @@ npm run export:android    # expo export --platform android → dist/, kèm expoC
 npm run publish:update    # đọc dist/, sinh store/ + manifest.json + releases.json vào site/
 ```
 
-`site/` là một **git worktree** trỏ tới nhánh `gh-pages` (đã thiết lập sẵn: `git worktree list` cho thấy nó ở `gh-pages`). Sau khi `publish:update` chạy xong, commit và push trong `site/`:
+`site/` là một **git worktree** trỏ tới nhánh `gh-pages`. Worktree không đi kèm khi clone repo — máy mới phải tự tạo một lần:
+
+```bash
+git fetch origin gh-pages
+git worktree add site gh-pages
+```
+
+Kiểm tra bằng `git worktree list`: phải thấy `site/` gắn với `gh-pages`. Thiếu bước này thì `npm run publish:update` sẽ ghi vào một thư mục `site/` thường, không nằm trong nhánh nào, và không có gì để push.
+
+Sau khi `publish:update` chạy xong, commit và push trong `site/`:
 
 ```bash
 cd site
@@ -151,12 +168,34 @@ Client `expo-updates` ghi nhớ `id` của các bản đã từng chạy thành 
 
 Vì vậy `tools/rollback.ts` giữ nguyên `launchAsset` và `assets` của bản cũ (không build lại, không upload lại — đây là lý do `store/` content-addressed khiến rollback gần như miễn phí) nhưng cấp một `id` mới (dẫn xuất tất định từ `id` gốc + thời điểm rollback) và `createdAt` mới. Với client, đây là một update hoàn toàn mới cần tải về, dù nội dung giống hệt bản đã chạy trước đó.
 
+Đã kiểm chứng trên thiết bị: commit rollback chỉ đụng **hai file JSON**, không thêm byte nào vào `store/`, và app nhận bản rollback dưới một `id` mới rồi chạy đúng nội dung cũ. Chi tiết ở [`docs/rollback-notes.md`](docs/rollback-notes.md).
+
+### Rollback KHÔNG tức thì — đọc trước khi coi đây là nút cứu hoả
+
+Ba điều đo được khi chạy thật, không có cái nào hiển nhiên từ tài liệu Expo:
+
+1. **Bản rollback mất 6–9 phút mới tới thiết bị.** Nguyên nhân là cache edge của GitHub Pages (mục 7), và **không có cách nào ép nó hết hạn sớm**. Nếu yêu cầu vận hành là "gỡ bản hỏng trong vài phút", kiến trúc host tĩnh hiện tại không đáp ứng được — đó là lúc dùng đường lui Cloudflare Pages ở mục 9, nơi đặt được `Cache-Control` riêng cho `manifest.json`.
+
+2. **Rollback tự động L1 không vô hình với người dùng.** Khi bundle crash lúc khởi động, `expo-updates` đúng là tự quay về bản OTA lành trước đó (không phải bản embedded), nhưng **phải mở lại app hai lần** mới thấy giao diện: lần mở đầu tiên sau crash vẫn là màn hình trắng, dù log đã ghi `UpdatesErrorRecovery: falling back to older update`.
+
+3. **L1 không tự dọn nguồn lỗi.** Chừng nào `manifest.json` trên server còn trỏ bản hỏng, mỗi lần khởi động app lại tải nó về. L1 chỉ giữ cho app chạy được; muốn dứt điểm buộc phải publish bản lành hoặc chạy rollback L2. Đừng thấy app "tự khỏi" mà tưởng sự cố đã xong.
+
+`isEmergencyLaunch` **không** bật `true` trong kịch bản này — đừng dùng cờ đó để phát hiện rollback L1 đã xảy ra.
+
 ## 7. Độ trễ CDN ~10 phút — đúng thiết kế, không phải lỗi
 
 Sau khi publish, có thể mất tới khoảng 10 phút để thiết bị nhận được `manifest.json` mới. Đây là hành vi đúng thiết kế của GitHub Pages, không phải một lỗi cần vá:
 
 - GitHub Pages trả `Cache-Control: max-age=600` trên các response tĩnh.
-- Đã quan sát thực nghiệm: edge CDN mà thiết bị test kết nối tới vẫn giữ bản `manifest.json` cũ, trong khi `curl` chạy từ một máy khác (kết nối qua edge khác) đã thấy bản mới ngay lập tức. Đây không phải do thiết bị cache — server cache theo edge.
+- Đây là cache **theo edge của server**, không phải cache trên thiết bị. Số đo trong một phiên kiểm thử, tính từ lúc `git push` tới lúc thấy manifest mới:
+
+  | Lần publish | Máy chạy `curl` thấy sau | Thiết bị thấy sau |
+  |---|---|---|
+  | bản lành v4 | 16 giây | 451 giây |
+  | bản hỏng | < 150 giây | 541 giây |
+  | rollback | — | 361 giây |
+
+  Chênh lệch này là cái bẫy lớn nhất khi kiểm thử: **`curl` từ máy bạn thấy bản mới không có nghĩa là thiết bị thấy**. Đừng kết luận "publish hỏng" trước khi đợi đủ 10 phút.
 
 `store/` không bị ảnh hưởng bởi độ trễ này vì nó content-addressed và không bao giờ bị ghi đè — chỉ `manifest.json` (file duy nhất bị ghi đè mỗi lần publish) chịu độ trễ cache.
 
@@ -194,5 +233,17 @@ Nó được **giữ lại có chủ đích làm đường lui**: kiến trúc h
 ## Tham khảo thêm
 
 - Thiết kế đầy đủ: [`docs/superpowers/specs/2026-09-07-expo-github-cdn-hot-update-design.md`](docs/superpowers/specs/2026-09-07-expo-github-cdn-hot-update-design.md)
+- Kết quả kiểm chứng rollback trên thiết bị: [`docs/rollback-notes.md`](docs/rollback-notes.md)
+- Kết quả kiểm chứng gating trên thiết bị: [`docs/gating-notes.md`](docs/gating-notes.md)
 - Bản vá: [`patches/expo-updates+57.0.21.patch`](patches/expo-updates+57.0.21.patch)
 - Bộ công cụ publish/rollback: [`tools/`](tools/) — chạy test bằng `npm run test:tools`
+
+## Nội dung nhánh `gh-pages`
+
+| Đường dẫn | Là gì |
+|---|---|
+| `production/1.0.0/android/` | Update site đang phục vụ thật — `manifest.json` + `releases.json` |
+| `store/` | Bundle và asset content-addressed, dùng chung mọi channel/runtimeVersion. **Không bao giờ xóa** — rollback dựa vào đây |
+| `probe/` | Hai file tĩnh từ bước xác minh hosting ban đầu (Task 1). Giữ lại làm mốc kiểm tra nhanh xem Pages còn phục vụ được không |
+| `_headers` | Vô tác dụng trên GitHub Pages — giữ làm đường lui sang Cloudflare Pages, xem mục 9 |
+| `.nojekyll` | Bắt buộc: nếu thiếu, Jekyll sẽ nuốt mọi file/thư mục bắt đầu bằng `_` mà không báo lỗi |
