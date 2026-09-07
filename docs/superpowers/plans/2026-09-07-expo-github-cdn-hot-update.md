@@ -6,9 +6,27 @@
 
 **Architecture:** App dùng `expo-updates` nguyên bản, trỏ tới một `manifest.json` tĩnh trên GitHub Pages. Một bộ tool Node biến output của `expo export` thành cây tĩnh đúng Expo Updates protocol v1: manifest nằm ở đường dẫn `<channel>/<runtimeVersion>/<platform>/`, còn bundle và assets nằm trong `store/` đặt tên theo nội dung (content-addressed) dùng chung toàn cục. Vì tên file bằng hash nội dung nên file cũ không bao giờ bị ghi đè, khiến rollback chỉ là việc ghi lại manifest.
 
-**Tech Stack:** Expo SDK 57, `expo-updates`, React Native, TypeScript, Node ≥ 20, `tsx`, `vitest`, GitHub Actions, GitHub Pages.
+**Tech Stack:** Expo SDK 57, `expo-updates`, React Native, TypeScript, Node 24, `tsx`, `vitest`, GitHub Actions, GitHub Pages.
 
 **Spec:** `docs/superpowers/specs/2026-09-07-expo-github-cdn-hot-update-design.md`
+
+## Môi trường đã xác minh
+
+Đã kiểm tra trên máy thật ngày 2026-09-07. **Không cần kiểm tra lại.**
+
+| Thứ | Trạng thái |
+|---|---|
+| Node / npm | v24.15.0 / 11.12.1 ✓ |
+| JDK | OpenJDK 21.0.8 ✓ |
+| Android SDK | `C:\Users\HOANG\AppData\Local\Android\Sdk` ✓ |
+| Thiết bị Android | máy thật đang cắm, serial `R3CM80Z2SDD` ✓ |
+| `gh` CLI | v2.96.0, đã đăng nhập tài khoản `hoanghdtv` ✓ |
+| `ANDROID_HOME` | **chưa set** — Task 1 Step 1 xử lý |
+| git remote | **chưa có** — Task 1 Step 8 tạo repo bằng `gh` |
+
+Repo đích: **`hoanghdtv/expo-app-update`, public**. Public là bắt buộc — GitHub Pages trên repo private đòi tài khoản Pro trả phí.
+
+URL update site: `https://hoanghdtv.github.io/expo-app-update`
 
 ## Global Constraints
 
@@ -25,7 +43,8 @@
 - Nhánh `gh-pages` **bắt buộc** có file `.nojekyll` ở gốc.
 - **Không** bật `disableAntiBrickingMeasures` và **không** dùng `Updates.setUpdateURLAndRequestHeadersOverride()` — chúng vô hiệu hóa rollback tự động.
 - Mọi lệnh build để test update phải là **release variant** (`--variant release`). Bản debug nạp JS từ Metro và bỏ qua `expo-updates` hoàn toàn.
-- `<user>` và `<repo>` trong toàn bộ kế hoạch là tài khoản GitHub và tên repo thật, chốt ở Task 1. Chúng là tham số cấu hình, không phải hạng mục bỏ ngỏ.
+- **Không dùng biến môi trường để cấu hình.** Cú pháp `VAR=x npm run ...` không chạy trên PowerShell/cmd, và việc `app.config.js` với bộ publish đọc hai nguồn khác nhau sẽ gây lệch URL âm thầm. Nguồn sự thật duy nhất là `update.config.json`, cả app lẫn tooling cùng đọc.
+- Mọi lệnh trong kế hoạch chạy được ở **cả Git Bash lẫn PowerShell**, trừ các lệnh POSIX được đánh dấu rõ là "chạy trong Git Bash".
 
 ---
 
@@ -33,94 +52,159 @@
 
 | File | Trách nhiệm |
 |---|---|
-| `app.config.js` | Cấu hình Expo; dựng `updates.url` từ env; đặt `extra.updateChannel` |
+| `update.config.json` | **Nguồn sự thật duy nhất**: user, repo, channel, runtimeVersion, platform |
+| `app.config.js` | Cấu hình Expo; dựng `updates.url` từ `update.config.json` |
 | `App.tsx` | Điểm vào, render `UpdatePanel` |
-| `src/UpdatePanel.tsx` | Toàn bộ UI POC: banner phiên bản, ảnh, font, thông tin update, nút điều khiển |
+| `src/UpdatePanel.tsx` | Toàn bộ UI POC: banner, ảnh, font, thông tin update, nút điều khiển |
 | `src/version.ts` | Hằng số banner — file được sửa để tạo ra bản update mới |
 | `assets/demo/photo.png` | Asset ảnh dùng cho kịch bản update asset |
-| `tools/config.ts` | Đọc và validate biến môi trường thành `PublishConfig` |
+| `tools/config.ts` | Đọc và validate `update.config.json` thành `PublishConfig` |
 | `tools/hashing.ts` | `sha256Base64Url`, `sha256Hex`, `md5Hex`, `uuidFromSha256Hex` |
+| `tools/io.ts` | `writeJson` và `gitSha` — dùng chung cho publish và rollback |
 | `tools/metadata.ts` | Đọc và validate `dist/metadata.json` |
-| `tools/io.ts` | `writeJson` và `gitSha` — dùng chung cho cả publish và rollback |
 | `tools/store.ts` | Copy file vào `store/` theo hash, merge không xóa |
 | `tools/manifest.ts` | Dựng object manifest đúng protocol |
 | `tools/releases.ts` | Đọc/ghi `releases.json`, tra cứu, dựng manifest rollback |
 | `tools/expo-config.ts` | Sinh `dist/expoConfig.json` cho `manifest.extra.expoClient` |
 | `tools/publish.ts` | CLI publish |
-| `tools/rollback.ts` | CLI rollback |
+| `tools/rollback.ts` | CLI rollback, nhận id qua tham số dòng lệnh |
 | `.github/workflows/publish.yml` | CI publish |
 | `.github/workflows/rollback.yml` | CI rollback thủ công |
 
-Ranh giới: `hashing`/`manifest`/`releases` là hàm thuần, không đụng filesystem ngoài việc nhận Buffer — nên test được trực tiếp. `store` và `metadata` là lớp chạm filesystem, test bằng thư mục tạm thật. `publish`/`rollback` chỉ điều phối, không chứa logic riêng.
+Ranh giới: `hashing`/`manifest`/`releases`/`config` là hàm thuần, test được trực tiếp. `store` và `metadata` chạm filesystem, test bằng thư mục tạm thật. `publish`/`rollback` chỉ điều phối, không chứa logic riêng.
 
 ---
 
-### Task 1: Scaffold app + xác minh GitHub Pages phục vụ được file
+### Task 1: Scaffold app + tạo repo + xác minh GitHub Pages phục vụ được file
 
 Đây là task chặn rủi ro. Spec mục 9 nêu có báo cáo lỗi tải asset khi host trên GitHub Pages. Task này xác nhận tầng hosting hoạt động **trước khi** viết bất kỳ tooling nào.
 
 **Files:**
-- Create: `app.config.js`, `App.tsx`, `src/version.ts`, `src/UpdatePanel.tsx`, `.gitignore`
+- Create: `update.config.json`, `app.config.js`, `App.tsx`, `src/version.ts`, `src/UpdatePanel.tsx`, `.gitignore`
 - Create (nhánh `gh-pages`): `.nojekyll`, `probe/hello.js`, `probe/hello.png`
 
 **Interfaces:**
 - Consumes: không có
-- Produces: `src/version.ts` export `BANNER_TEXT: string` và `BANNER_COLOR: string`; `app.config.js` đặt `extra.updateChannel: string`
+- Produces:
+  - `update.config.json` với các khóa `githubUser`, `repoName`, `channel`, `runtimeVersion`, `platform`
+  - `src/version.ts` export `BANNER_TEXT: string` và `BANNER_COLOR: string`
 
-- [ ] **Step 1: Tạo app Expo**
+- [ ] **Step 1: Set `ANDROID_HOME`**
+
+Chưa được set trên máy này; `expo run:android` sẽ thất bại nếu thiếu.
+
+Đặt vĩnh viễn (PowerShell, chạy một lần):
+
+```powershell
+setx ANDROID_HOME "C:\Users\HOANG\AppData\Local\Android\Sdk"
+```
+
+Sau `setx` phải **mở terminal mới** thì biến mới có hiệu lực. Cho phiên Git Bash đang mở:
 
 ```bash
-npx create-expo-app@latest . --template blank-typescript
+export ANDROID_HOME="/c/Users/HOANG/AppData/Local/Android/Sdk"
+export PATH="$ANDROID_HOME/platform-tools:$PATH"
+```
+
+Xác nhận:
+
+```bash
+adb devices
+```
+
+Kỳ vọng: thấy `R3CM80Z2SDD	device`.
+
+- [ ] **Step 2: Tạo app Expo vào thư mục tạm rồi chuyển lên gốc**
+
+Thư mục gốc đã có `docs/` và `.git/`, mà `create-expo-app` từ chối chạy trong thư mục không rỗng. Nên scaffold vào thư mục tạm rồi chuyển lên.
+
+Chạy trong Git Bash:
+
+```bash
+npx create-expo-app@latest .tmp-scaffold --template blank-typescript --no-install
+mv .tmp-scaffold/* .
+mv .tmp-scaffold/.[!.]* . 2>/dev/null || true
+rmdir .tmp-scaffold
+npm install
 npx expo install expo-updates expo-constants
 npm i -D tsx vitest
 ```
 
-- [ ] **Step 2: Viết `app.config.js`**
+Xác nhận: `ls assets/*.png` liệt kê ít nhất hai file PNG (Task 6 cần hai ảnh khác nhau). Ghi lại tên chúng.
 
-Xóa `app.json` nếu template tạo ra, thay bằng file này. Thay `<user>` và `<repo>` bằng giá trị thật.
+- [ ] **Step 3: Viết `update.config.json`**
+
+```json
+{
+  "githubUser": "hoanghdtv",
+  "repoName": "expo-app-update",
+  "channel": "production",
+  "runtimeVersion": "1.0.0",
+  "platform": "android"
+}
+```
+
+Đây là nguồn sự thật duy nhất. Đổi channel hay runtimeVersion nghĩa là sửa file này — không có biến môi trường nào cả.
+
+- [ ] **Step 4: Viết `app.config.js`**
+
+Xóa `app.json` mà template sinh ra, thay bằng file này.
 
 ```js
-const GITHUB_USER = process.env.GITHUB_USER ?? '<user>';
-const REPO_NAME = process.env.REPO_NAME ?? '<repo>';
-const CHANNEL = process.env.UPDATE_CHANNEL ?? 'production';
-const RUNTIME_VERSION = process.env.RUNTIME_VERSION ?? '1.0.0';
-const PLATFORM = 'android';
+const cfg = require('./update.config.json');
 
-const BASE_URL = `https://${GITHUB_USER}.github.io/${REPO_NAME}`;
+const BASE_URL = `https://${cfg.githubUser}.github.io/${cfg.repoName}`;
 
 module.exports = {
   expo: {
     name: 'expo-app-update',
     slug: 'expo-app-update',
     version: '1.0.0',
-    android: { package: 'com.example.expoappupdate' },
-    runtimeVersion: RUNTIME_VERSION,
+    orientation: 'portrait',
+    android: { package: 'com.hoanghdtv.expoappupdate' },
+    runtimeVersion: cfg.runtimeVersion,
     updates: {
-      url: `${BASE_URL}/${CHANNEL}/${RUNTIME_VERSION}/${PLATFORM}/manifest.json`,
+      url: `${BASE_URL}/${cfg.channel}/${cfg.runtimeVersion}/${cfg.platform}/manifest.json`,
       enabled: true,
       checkAutomatically: 'ON_LOAD',
       fallbackToCacheTimeout: 0,
     },
     extra: {
-      updateChannel: CHANNEL,
+      updateChannel: cfg.channel,
       baseUrl: BASE_URL,
     },
   },
 };
 ```
 
-`runtimeVersion` cố ý là chuỗi cứng, không dùng policy `appVersion` — kịch bản gating ở Task 8 cần kiểm soát giá trị này bằng tay.
+`runtimeVersion` cố ý là chuỗi lấy từ file, không dùng policy `appVersion` — kịch bản gating ở Task 9 cần đổi giá trị này có kiểm soát.
 
-- [ ] **Step 3: Viết `src/version.ts`**
+- [ ] **Step 5: Viết `.gitignore`**
+
+```
+node_modules/
+.expo/
+dist/
+site/
+android/
+ios/
+.tmp-scaffold/
+*.log
+.DS_Store
+```
+
+`site/` bắt buộc phải có: từ Task 5 nó là một git worktree của nhánh `gh-pages`, không được để nhánh `main` theo dõi. `android/` cũng bỏ qua vì được sinh lại từ `app.config.js` mỗi lần prebuild.
+
+- [ ] **Step 6: Viết `src/version.ts`**
 
 ```ts
 export const BANNER_TEXT = 'v1 — EMBEDDED';
 export const BANNER_COLOR = '#1e3a8a';
 ```
 
-- [ ] **Step 4: Viết `src/UpdatePanel.tsx`**
+- [ ] **Step 7: Viết `src/UpdatePanel.tsx`**
 
-`Updates.channel` **luôn `undefined`** với custom server (nó chỉ được điền khi dùng EAS Update), nên channel đọc từ `expo-constants`.
+`Updates.channel` **luôn `undefined`** với custom server — nó chỉ được điền khi dùng EAS Update. Channel đọc từ `expo-constants`.
 
 ```tsx
 import Constants from 'expo-constants';
@@ -183,31 +267,31 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 5: Viết `App.tsx`**
+- [ ] **Step 8: Viết `App.tsx`**
 
 ```tsx
 import UpdatePanel from './src/UpdatePanel';
+
 export default function App() {
   return <UpdatePanel />;
 }
 ```
 
-- [ ] **Step 6: Build release và chạy trên thiết bị/emulator Android**
+- [ ] **Step 9: Tạo repo trên GitHub và push `main`**
 
 ```bash
-npx expo run:android --variant release
+git add -A
+git commit -m "feat: scaffold app Expo với expo-updates"
+gh repo create hoanghdtv/expo-app-update --public --source=. --remote=origin --push
 ```
 
-Bản debug bỏ qua `expo-updates` hoàn toàn — bắt buộc phải là release.
+Xác nhận: `git remote -v` hiển thị `origin`.
 
-Kỳ vọng: app chạy, banner ghi `v1 — EMBEDDED`, `isEmbeddedLaunch: true`, `updateId` là `(none)` hoặc id của bản embedded.
+- [ ] **Step 10: Tạo nhánh `gh-pages` và bật GitHub Pages**
 
-- [ ] **Step 7: Tạo nhánh `gh-pages` và bật GitHub Pages**
-
-Cần một file PNG thật để kiểm tra Content-Type, nên copy một icon của template ra ngoài repo trước khi chuyển nhánh:
+Cần một file PNG thật để kiểm tra Content-Type, nên copy một icon ra ngoài repo trước khi chuyển nhánh. Chạy trong Git Bash:
 
 ```bash
-ls assets/*.png                      # xem template sinh ra những file nào
 cp "$(ls assets/*.png | head -1)" ../probe-image.png
 
 git checkout --orphan gh-pages
@@ -216,31 +300,56 @@ touch .nojekyll
 mkdir -p probe
 echo 'console.log("probe");' > probe/hello.js
 cp ../probe-image.png probe/hello.png
-git add -A && git commit -m "chore: khởi tạo update site"
+git add -A
+git commit -m "chore: khởi tạo update site"
 git push -u origin gh-pages
 git checkout main
 ```
 
-Trong Settings → Pages của repo, đặt Source = nhánh `gh-pages`, thư mục `/ (root)`.
-
-- [ ] **Step 8: Xác minh Pages phục vụ đúng — ĐÂY LÀ CỔNG CHẶN RỦI RO**
-
-Chờ Pages deploy xong (~1 phút), rồi:
+Bật Pages không cần vào giao diện web:
 
 ```bash
-curl -I https://<user>.github.io/<repo>/probe/hello.js
-curl -I https://<user>.github.io/<repo>/probe/hello.png
+gh api -X POST /repos/hoanghdtv/expo-app-update/pages \
+  -f "source[branch]=gh-pages" -f "source[path]=/"
 ```
 
-Kỳ vọng: cả hai trả `HTTP/2 200`. `hello.js` có `content-type: application/javascript` (hoặc `text/javascript`), `hello.png` có `content-type: image/png`.
+Nếu trả về lỗi `409 Conflict` nghĩa là Pages đã bật rồi — bỏ qua, đi tiếp.
 
-Nếu nhận 404: gần như chắc chắn là thiếu `.nojekyll` hoặc Pages chưa deploy xong. **Không đi tiếp cho tới khi hai lệnh này trả 200** — toàn bộ thiết kế phụ thuộc vào nó.
+- [ ] **Step 11: XÁC MINH HOSTING — CỔNG CHẶN RỦI RO**
 
-- [ ] **Step 9: Commit**
+Chờ Pages deploy (~1–2 phút). Kiểm tra tiến độ:
+
+```bash
+gh api /repos/hoanghdtv/expo-app-update/pages/builds/latest --jq '.status'
+```
+
+Kỳ vọng `built`. Rồi:
+
+```bash
+curl -I https://hoanghdtv.github.io/expo-app-update/probe/hello.js
+curl -I https://hoanghdtv.github.io/expo-app-update/probe/hello.png
+```
+
+Kỳ vọng: cả hai trả `HTTP/2 200`. `hello.js` có `content-type: application/javascript` hoặc `text/javascript`; `hello.png` có `content-type: image/png`.
+
+Nếu nhận 404: gần như chắc chắn thiếu `.nojekyll` hoặc Pages chưa deploy xong. **Không đi tiếp cho tới khi cả hai trả 200** — toàn bộ thiết kế phụ thuộc vào điều này.
+
+- [ ] **Step 12: Build release và chạy trên máy Android**
+
+```bash
+npx expo run:android --variant release
+```
+
+Bản debug bỏ qua `expo-updates` hoàn toàn — bắt buộc release. Bản release dùng keystore debug mặc định của template nên không cần cấu hình ký; nếu gặp lỗi ký thì xem `android/app/build.gradle`, mục `buildTypes.release.signingConfig`.
+
+Kỳ vọng: app chạy trên máy `R3CM80Z2SDD`, banner ghi `v1 — EMBEDDED`, `isEmbeddedLaunch: true`, `channel (từ extra): production`.
+
+- [ ] **Step 13: Commit**
 
 ```bash
 git add -A
-git commit -m "feat: scaffold app Expo + xác minh hosting GitHub Pages"
+git commit -m "feat: cấu hình update site và xác minh hosting GitHub Pages"
+git push
 ```
 
 ---
@@ -250,6 +359,7 @@ git commit -m "feat: scaffold app Expo + xác minh hosting GitHub Pages"
 **Files:**
 - Create: `tools/hashing.ts`
 - Test: `tools/hashing.test.ts`
+- Modify: `package.json`
 
 **Interfaces:**
 - Consumes: không có
@@ -285,7 +395,7 @@ describe('sha256Base64Url', () => {
 
   it('không còn ký tự nào ngoài bảng chữ base64url', () => {
     for (let i = 0; i < 200; i++) {
-      const out = sha256Base64Url(Buffer.from(`mẫu-${i}`));
+      const out = sha256Base64Url(Buffer.from(`mau-${i}`));
       expect(out).toMatch(/^[A-Za-z0-9_-]+$/);
     }
   });
@@ -468,7 +578,7 @@ export type ExportMetadata = {
 export function readExportMetadata(distDir: string): { raw: Buffer; parsed: ExportMetadata } {
   const metadataPath = join(distDir, 'metadata.json');
   if (!existsSync(metadataPath)) {
-    throw new Error(`Không tìm thấy metadata.json tại ${metadataPath}. Đã chạy "expo export" chưa?`);
+    throw new Error(`Không tìm thấy metadata.json tại ${metadataPath}. Đã chạy "npm run export:android" chưa?`);
   }
   const raw = readFileSync(metadataPath);
   return { raw, parsed: JSON.parse(raw.toString('utf-8')) as ExportMetadata };
@@ -477,8 +587,8 @@ export function readExportMetadata(distDir: string): { raw: Buffer; parsed: Expo
 export function selectPlatform(parsed: ExportMetadata, platform: string): PlatformMetadata {
   const block = parsed.fileMetadata?.[platform];
   if (!block) {
-    const có = Object.keys(parsed.fileMetadata ?? {}).join(', ') || '(không có)';
-    throw new Error(`metadata.json không chứa platform "${platform}". Có sẵn: ${có}`);
+    const available = Object.keys(parsed.fileMetadata ?? {}).join(', ') || '(không có)';
+    throw new Error(`metadata.json không chứa platform "${platform}". Có sẵn: ${available}`);
   }
   return block;
 }
@@ -512,8 +622,8 @@ git commit -m "feat(tools): đọc metadata.json của expo export"
 - Produces:
   - `type StoredFile = { hashBase64Url: string; keyMd5: string; sha256Hex: string; storeFileName: string; ext: string }`
   - `storeFile(opts: { sourcePath: string; ext: string; siteDir: string }): StoredFile`
-  - `type ManifestAsset = { hash: string; key: string; contentType: string; fileExtension: string; url: string }`
   - `type ManifestLaunchAsset = { hash: string; key: string; contentType: string; url: string }`
+  - `type ManifestAsset = ManifestLaunchAsset & { fileExtension: string }`
   - `type UpdateManifest = { id: string; createdAt: string; runtimeVersion: string; launchAsset: ManifestLaunchAsset; assets: ManifestAsset[]; metadata: Record<string, never>; extra: { expoClient: unknown } }`
   - `contentTypeForExt(ext: string): string`
   - `storeUrl(baseUrl: string, stored: StoredFile): string`
@@ -549,8 +659,8 @@ describe('storeFile', () => {
   it('nội dung giống nhau cho ra một file duy nhất', () => {
     const siteDir = tmp();
     const dir = tmp();
-    writeFileSync(join(dir, 'x.png'), 'trùng');
-    writeFileSync(join(dir, 'y.png'), 'trùng');
+    writeFileSync(join(dir, 'x.png'), 'trung');
+    writeFileSync(join(dir, 'y.png'), 'trung');
 
     storeFile({ sourcePath: join(dir, 'x.png'), ext: 'png', siteDir });
     storeFile({ sourcePath: join(dir, 'y.png'), ext: 'png', siteDir });
@@ -561,13 +671,13 @@ describe('storeFile', () => {
   it('không xóa file đã có trong store — rollback phụ thuộc vào điều này', () => {
     const siteDir = tmp();
     const dir = tmp();
-    writeFileSync(join(dir, 'cũ.js'), 'bundle cũ');
-    writeFileSync(join(dir, 'mới.js'), 'bundle mới');
+    writeFileSync(join(dir, 'old.js'), 'bundle cu');
+    writeFileSync(join(dir, 'new.js'), 'bundle moi');
 
-    const cũ = storeFile({ sourcePath: join(dir, 'cũ.js'), ext: 'js', siteDir });
-    storeFile({ sourcePath: join(dir, 'mới.js'), ext: 'js', siteDir });
+    const old = storeFile({ sourcePath: join(dir, 'old.js'), ext: 'js', siteDir });
+    storeFile({ sourcePath: join(dir, 'new.js'), ext: 'js', siteDir });
 
-    expect(readFileSync(join(siteDir, 'store', cũ.storeFileName), 'utf-8')).toBe('bundle cũ');
+    expect(readFileSync(join(siteDir, 'store', old.storeFileName), 'utf-8')).toBe('bundle cu');
     expect(readdirSync(join(siteDir, 'store'))).toHaveLength(2);
   });
 });
@@ -656,8 +766,8 @@ describe('contentTypeForExt', () => {
 
 describe('storeUrl', () => {
   it('ghép URL tuyệt đối tới store', () => {
-    expect(storeUrl('https://u.github.io/r', image)).toBe(
-      'https://u.github.io/r/store/aa11.png'
+    expect(storeUrl('https://hoanghdtv.github.io/expo-app-update', image)).toBe(
+      'https://hoanghdtv.github.io/expo-app-update/store/aa11.png'
     );
   });
 });
@@ -667,14 +777,16 @@ describe('buildManifest', () => {
     id: '11111111-2222-3333-4444-555555555555',
     createdAt: '2026-09-07T00:00:00.000Z',
     runtimeVersion: '1.0.0',
-    baseUrl: 'https://u.github.io/r',
+    baseUrl: 'https://hoanghdtv.github.io/expo-app-update',
     launch, assets: [image],
     expoClient: { name: 'demo' },
   });
 
   it('launchAsset khai báo application/javascript và không có fileExtension', () => {
     expect(manifest.launchAsset.contentType).toBe('application/javascript');
-    expect(manifest.launchAsset.url).toBe('https://u.github.io/r/store/ff00.js');
+    expect(manifest.launchAsset.url).toBe(
+      'https://hoanghdtv.github.io/expo-app-update/store/ff00.js'
+    );
     expect('fileExtension' in manifest.launchAsset).toBe(false);
   });
 
@@ -797,22 +909,24 @@ git commit -m "feat(tools): store content-addressed và dựng manifest"
 
 ### Task 5: CLI publish — kịch bản E2E #1 (update JS)
 
-Đây là task đầu tiên chứng minh vòng lặp hot update chạy thật.
+Task đầu tiên chứng minh vòng lặp hot update chạy thật.
 
 **Files:**
 - Create: `tools/config.ts`, `tools/io.ts`, `tools/releases.ts`, `tools/expo-config.ts`, `tools/publish.ts`
 - Test: `tools/config.test.ts`, `tools/releases.test.ts`
-- Modify: `package.json` (thêm script)
+- Modify: `package.json`
 
 **Interfaces:**
 - Consumes: toàn bộ interface của Task 2–4
 - Produces:
+  - `type UpdateConfigFile = { githubUser: string; repoName: string; channel: string; runtimeVersion: string; platform: string }`
+  - `type PublishConfig = UpdateConfigFile & { baseUrl: string; siteDir: string; distDir: string }`
+  - `resolveConfig(file: UpdateConfigFile): PublishConfig`
+  - `readConfig(cwd: string): PublishConfig`
+  - `manifestPathFor(cfg: PublishConfig): string`
+  - `releasesPathFor(cfg: PublishConfig): string`
   - `writeJson(absPath: string, value: unknown): void`
   - `gitSha(): string`
-  - `type PublishConfig = { githubUser: string; repoName: string; channel: string; runtimeVersion: string; platform: string; baseUrl: string; siteDir: string; distDir: string }`
-  - `loadConfig(env: Record<string, string | undefined>): PublishConfig`
-  - `manifestPathFor(cfg: PublishConfig): string` — đường dẫn tương đối `<channel>/<rv>/<platform>/manifest.json`
-  - `releasesPathFor(cfg: PublishConfig): string`
   - `type ReleaseEntry = { id: string; createdAt: string; gitSha: string; rollbackOf?: string; manifest: UpdateManifest }`
   - `type ReleasesFile = { channel: string; runtimeVersion: string; platform: string; releases: ReleaseEntry[] }`
   - `readReleases(absPath: string, defaults: Omit<ReleasesFile, 'releases'>): ReleasesFile`
@@ -825,34 +939,39 @@ git commit -m "feat(tools): store content-addressed và dựng manifest"
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { loadConfig, manifestPathFor, releasesPathFor } from './config';
+import { manifestPathFor, releasesPathFor, resolveConfig } from './config';
 
-const ENV = {
-  GITHUB_USER: 'u', REPO_NAME: 'r', UPDATE_CHANNEL: 'production',
-  RUNTIME_VERSION: '1.0.0', SITE_DIR: 'site', DIST_DIR: 'dist',
+const FILE = {
+  githubUser: 'hoanghdtv',
+  repoName: 'expo-app-update',
+  channel: 'production',
+  runtimeVersion: '1.0.0',
+  platform: 'android',
 };
 
-describe('loadConfig', () => {
-  it('dựng baseUrl từ user và repo', () => {
-    expect(loadConfig(ENV).baseUrl).toBe('https://u.github.io/r');
+describe('resolveConfig', () => {
+  it('dựng baseUrl từ githubUser và repoName', () => {
+    expect(resolveConfig(FILE).baseUrl).toBe('https://hoanghdtv.github.io/expo-app-update');
   });
 
-  it('mặc định platform là android', () => {
-    expect(loadConfig(ENV).platform).toBe('android');
+  it('mặc định siteDir là site và distDir là dist', () => {
+    const cfg = resolveConfig(FILE);
+    expect(cfg.siteDir).toBe('site');
+    expect(cfg.distDir).toBe('dist');
   });
 
-  it('báo lỗi nêu đích danh biến còn thiếu', () => {
-    expect(() => loadConfig({ ...ENV, GITHUB_USER: undefined })).toThrow(/GITHUB_USER/);
+  it('báo lỗi nêu đích danh khóa còn thiếu', () => {
+    expect(() => resolveConfig({ ...FILE, githubUser: '' })).toThrow(/githubUser/);
   });
 });
 
 describe('đường dẫn', () => {
   it('manifest nằm dưới channel/runtimeVersion/platform', () => {
-    expect(manifestPathFor(loadConfig(ENV))).toBe('production/1.0.0/android/manifest.json');
+    expect(manifestPathFor(resolveConfig(FILE))).toBe('production/1.0.0/android/manifest.json');
   });
 
   it('releases nằm cạnh manifest', () => {
-    expect(releasesPathFor(loadConfig(ENV))).toBe('production/1.0.0/android/releases.json');
+    expect(releasesPathFor(resolveConfig(FILE))).toBe('production/1.0.0/android/releases.json');
   });
 });
 ```
@@ -860,14 +979,12 @@ describe('đường dẫn', () => {
 `tools/releases.test.ts`:
 
 ```ts
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { UpdateManifest } from './manifest';
 import { appendRelease, findRelease, readReleases } from './releases';
 
 const DEFAULTS = { channel: 'production', runtimeVersion: '1.0.0', platform: 'android' };
+const MISSING = 'khong/ton/tai/releases.json';
 
 function entry(id: string) {
   return {
@@ -878,20 +995,19 @@ function entry(id: string) {
 
 describe('readReleases', () => {
   it('trả về file rỗng khi chưa tồn tại', () => {
-    const p = join(mkdtempSync(join(tmpdir(), 'rel-')), 'releases.json');
-    expect(readReleases(p, DEFAULTS).releases).toEqual([]);
+    expect(readReleases(MISSING, DEFAULTS).releases).toEqual([]);
   });
 });
 
 describe('appendRelease', () => {
   it('đặt bản mới nhất lên đầu', () => {
-    const f = appendRelease(appendRelease(readReleases('/không/tồn/tại', DEFAULTS), entry('a')), entry('b'));
+    const f = appendRelease(appendRelease(readReleases(MISSING, DEFAULTS), entry('a')), entry('b'));
     expect(f.releases.map((r) => r.id)).toEqual(['b', 'a']);
   });
 });
 
 describe('findRelease', () => {
-  const f = appendRelease(readReleases('/không/tồn/tại', DEFAULTS), entry('a'));
+  const f = appendRelease(readReleases(MISSING, DEFAULTS), entry('a'));
 
   it('tìm được theo id', () => {
     expect(findRelease(f, 'a').gitSha).toBe('deadbeef');
@@ -914,36 +1030,47 @@ Kỳ vọng: FAIL — không tìm thấy `./config` và `./releases`.
 - [ ] **Step 3: Viết `tools/config.ts`**
 
 ```ts
-export type PublishConfig = {
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+export type UpdateConfigFile = {
   githubUser: string;
   repoName: string;
   channel: string;
   runtimeVersion: string;
   platform: string;
+};
+
+export type PublishConfig = UpdateConfigFile & {
   baseUrl: string;
   siteDir: string;
   distDir: string;
 };
 
-function required(env: Record<string, string | undefined>, name: string): string {
-  const v = env[name];
-  if (!v) throw new Error(`Thiếu biến môi trường bắt buộc: ${name}`);
-  return v;
+const REQUIRED_KEYS: (keyof UpdateConfigFile)[] = [
+  'githubUser', 'repoName', 'channel', 'runtimeVersion', 'platform',
+];
+
+export function resolveConfig(file: UpdateConfigFile): PublishConfig {
+  for (const key of REQUIRED_KEYS) {
+    if (!file[key]) {
+      throw new Error(`update.config.json thiếu khóa bắt buộc hoặc để rỗng: ${key}`);
+    }
+  }
+  return {
+    ...file,
+    baseUrl: `https://${file.githubUser}.github.io/${file.repoName}`,
+    siteDir: 'site',
+    distDir: 'dist',
+  };
 }
 
-export function loadConfig(env: Record<string, string | undefined>): PublishConfig {
-  const githubUser = required(env, 'GITHUB_USER');
-  const repoName = required(env, 'REPO_NAME');
-  return {
-    githubUser,
-    repoName,
-    channel: env.UPDATE_CHANNEL ?? 'production',
-    runtimeVersion: env.RUNTIME_VERSION ?? '1.0.0',
-    platform: env.PLATFORM ?? 'android',
-    baseUrl: `https://${githubUser}.github.io/${repoName}`,
-    siteDir: env.SITE_DIR ?? 'site',
-    distDir: env.DIST_DIR ?? 'dist',
-  };
+export function readConfig(cwd: string): PublishConfig {
+  const path = join(cwd, 'update.config.json');
+  if (!existsSync(path)) {
+    throw new Error(`Không tìm thấy ${path}`);
+  }
+  return resolveConfig(JSON.parse(readFileSync(path, 'utf-8')) as UpdateConfigFile);
 }
 
 export function manifestPathFor(cfg: PublishConfig): string {
@@ -1010,7 +1137,7 @@ Kỳ vọng: PASS, 30 test.
 
 - [ ] **Step 6: Viết `tools/io.ts`**
 
-Dùng chung cho cả `publish.ts` và `rollback.ts` — cả hai đều cần ghi JSON có tạo thư mục cha và đều cần lấy git SHA.
+Dùng chung cho `publish.ts`, `rollback.ts` và `expo-config.ts`.
 
 ```ts
 import { execFileSync } from 'node:child_process';
@@ -1026,18 +1153,46 @@ export function gitSha(): string {
   try {
     return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf-8' }).trim();
   } catch {
-    // gitSha chỉ dùng để tra cứu — không có thì cũng không chặn việc publish
+    // gitSha chỉ để tra cứu — không có thì cũng không chặn việc publish
     return 'unknown';
   }
 }
 ```
 
-- [ ] **Step 7: Viết `tools/publish.ts`**
+- [ ] **Step 7: Viết `tools/expo-config.ts`**
+
+`expo export` **không** sinh `expoConfig.json`, mà `manifest.extra.expoClient` lại cần nội dung đó. Sinh nó bằng script riêng thay vì chuyển hướng stdout của `expo config` — CLI có thể in log lẫn vào JSON.
+
+```ts
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readConfig } from './config';
+import { writeJson } from './io';
+
+// import() động hoạt động với cả app.config.js dạng CommonJS lẫn ESM.
+async function main(): Promise<void> {
+  const cfg = readConfig(process.cwd());
+  const url = pathToFileURL(join(process.cwd(), 'app.config.js')).href;
+  const mod = (await import(url)) as { default?: { expo?: unknown }; expo?: unknown };
+  const expoClient = (mod.default ?? mod).expo;
+
+  if (!expoClient) {
+    throw new Error('app.config.js không export object có khóa "expo"');
+  }
+
+  writeJson(join(process.cwd(), cfg.distDir, 'expoConfig.json'), expoClient);
+  console.log(`Đã ghi ${cfg.distDir}/expoConfig.json`);
+}
+
+main();
+```
+
+- [ ] **Step 8: Viết `tools/publish.ts`**
 
 ```ts
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadConfig, manifestPathFor, releasesPathFor } from './config';
+import { manifestPathFor, readConfig, releasesPathFor } from './config';
 import { sha256Hex, uuidFromSha256Hex } from './hashing';
 import { gitSha, writeJson } from './io';
 import { buildManifest } from './manifest';
@@ -1046,7 +1201,7 @@ import { appendRelease, readReleases } from './releases';
 import { storeFile } from './store';
 
 function main(): void {
-  const cfg = loadConfig(process.env);
+  const cfg = readConfig(process.cwd());
 
   const { raw, parsed } = readExportMetadata(cfg.distDir);
   const platform = selectPlatform(parsed, cfg.platform);
@@ -1100,30 +1255,7 @@ function main(): void {
 main();
 ```
 
-- [ ] **Step 8: Viết `tools/expo-config.ts` và thêm script vào `package.json`**
-
-`expo export` **không** sinh ra `expoConfig.json`, mà `manifest.extra.expoClient` lại cần nội dung đó. Sinh nó bằng script riêng thay vì dựa vào việc chuyển hướng stdout của CLI — CLI có thể in thêm log lẫn vào JSON.
-
-`tools/expo-config.ts`:
-
-```ts
-import { join } from 'node:path';
-import { writeJson } from './io';
-
-// app.config.js export { expo: {...} } — đây chính là public config
-// mà Constants.expoConfig phản ánh lúc runtime.
-const config = require(join(process.cwd(), 'app.config.js'));
-const expoClient = config.expo ?? config.default?.expo;
-
-if (!expoClient) {
-  throw new Error('app.config.js không export object có khóa "expo"');
-}
-
-writeJson(join(process.cwd(), process.env.DIST_DIR ?? 'dist', 'expoConfig.json'), expoClient);
-console.log('Đã ghi dist/expoConfig.json');
-```
-
-`package.json`:
+- [ ] **Step 9: Thêm script vào `package.json`**
 
 ```json
 "scripts": {
@@ -1133,7 +1265,7 @@ console.log('Đã ghi dist/expoConfig.json');
 }
 ```
 
-- [ ] **Step 9: Chạy export và xác nhận đầu vào đúng như mong đợi**
+- [ ] **Step 10: Chạy export và xác nhận đầu vào đúng như mong đợi**
 
 ```bash
 npm run export:android
@@ -1141,46 +1273,51 @@ cat dist/metadata.json
 cat dist/expoConfig.json
 ```
 
-Kỳ vọng: `metadata.json` có `fileMetadata.android.bundle` (đường dẫn kết thúc bằng `.hbc`) và mảng `assets` với các mục `{ path, ext }`. `expoConfig.json` là object JSON có `name`, `slug` và `extra.updateChannel`.
+Kỳ vọng: `metadata.json` có `fileMetadata.android.bundle` (đường dẫn kết thúc bằng `.hbc`) và mảng `assets` gồm các mục `{ path, ext }`. `expoConfig.json` là object JSON có `name`, `slug` và `extra.updateChannel`.
 
-- [ ] **Step 10: Publish thật lên `gh-pages`**
+- [ ] **Step 11: Tạo worktree `site/` và publish lần đầu**
 
 ```bash
 git worktree add site gh-pages
-GITHUB_USER=<user> REPO_NAME=<repo> npm run publish:update
-cd site && git add -A && git commit -m "publish: update đầu tiên" && git push && cd ..
+npm run publish:update
+cd site
+git add -A
+git commit -m "publish: update dau tien"
+git push
+cd ..
 ```
 
-Dùng `git worktree` để `site/` là một checkout thật của `gh-pages`, nên `store/` giữ nguyên file cũ giữa các lần publish — đúng yêu cầu merge-không-replace ở spec mục 4.1.
+Dùng `git worktree` để `site/` là checkout thật của `gh-pages`, nên `store/` giữ nguyên file cũ giữa các lần publish — đúng yêu cầu merge-không-replace ở spec mục 4.1.
 
-- [ ] **Step 11: Xác minh manifest phục vụ được**
+- [ ] **Step 12: Xác minh manifest phục vụ được**
 
 ```bash
-curl -s https://<user>.github.io/<repo>/production/1.0.0/android/manifest.json | head -c 400
+curl -s https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json
 ```
 
-Kỳ vọng: JSON manifest, `content-type: application/json`. Kiểm tra `id` đúng dạng UUID.
+Kỳ vọng: JSON manifest, `id` đúng dạng UUID, `launchAsset.url` trỏ vào `/store/`.
 
-- [ ] **Step 12: KỊCH BẢN E2E #1 — update JS**
+- [ ] **Step 13: KỊCH BẢN E2E #1 — update JS**
 
-1. Sửa `src/version.ts` thành `BANNER_TEXT = 'v2 — OTA'`, `BANNER_COLOR = '#166534'`
+1. Sửa `src/version.ts`: `BANNER_TEXT = 'v2 — OTA'`, `BANNER_COLOR = '#166534'`
 2. `npm run export:android`
-3. `GITHUB_USER=<user> REPO_NAME=<repo> npm run publish:update`
-4. Commit và push trong `site/`
-5. Chờ ~1 phút cho Pages deploy
-6. Mở app trên máy Android, bấm **Kiểm tra update** → log ghi `available=true`
+3. `npm run publish:update`
+4. `cd site && git add -A && git commit -m "publish: v2" && git push && cd ..`
+5. Chờ ~1–2 phút cho Pages deploy
+6. Trên app: bấm **Kiểm tra update** → log ghi `available=true`
 7. Bấm **Tải update** → log ghi `new=true`
 8. Bấm **Restart để áp dụng**
 
 Kỳ vọng: banner đổi thành `v2 — OTA` màu xanh lá, `isEmbeddedLaunch: false`, `updateId` khớp `id` trong manifest.
 
-Nếu app báo `checkError`: kiểm tra bản build là release chứ không phải debug, và `updates.url` trong `AndroidManifest.xml` (`android/app/src/main/AndroidManifest.xml`, tìm `EXPO_UPDATE_URL`) trỏ đúng.
+Nếu app báo `checkError`: kiểm tra bản build là release chứ không phải debug, và `EXPO_UPDATE_URL` trong `android/app/src/main/AndroidManifest.xml` trỏ đúng.
 
-- [ ] **Step 13: Commit**
+- [ ] **Step 14: Commit**
 
 ```bash
 git add tools/ package.json src/version.ts
 git commit -m "feat(tools): CLI publish + xác minh hot update JS end-to-end"
+git push
 ```
 
 ---
@@ -1203,18 +1340,19 @@ mkdir -p assets/demo
 cp assets/icon.png assets/demo/photo.png
 ```
 
-Dùng luôn các icon mà template sinh ra làm ảnh demo — chúng khác nhau rõ rệt về mặt thị giác, đủ để nhận biết ảnh nào đang hiển thị. Nếu `assets/icon.png` không tồn tại, chạy `ls assets/*.png` và chọn hai file khác nhau: một cho bước này, một cho Step 5.
+Dùng luôn icon mà template sinh ra làm ảnh demo. Nếu `assets/icon.png` không tồn tại, dùng tên file đã ghi lại ở Task 1 Step 2 — cần hai file PNG khác nhau rõ rệt: một cho bước này, một cho Step 5.
 
 - [ ] **Step 2: Hiển thị ảnh và font trong `src/UpdatePanel.tsx`**
 
-Thêm import ở đầu file:
+Thêm import (`useFonts` lấy từ `expo-font`, không lấy từ package font — tránh phụ thuộc vào việc package có re-export hay không):
 
 ```tsx
-import { Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
+import { Inter_700Bold } from '@expo-google-fonts/inter';
+import { useFonts } from 'expo-font';
 import { Image } from 'react-native';
 ```
 
-Thêm vào đầu component, ngay sau `const [log, setLog] = ...`:
+Thêm ngay sau `const [log, setLog] = ...`:
 
 ```tsx
 const [fontsLoaded] = useFonts({ Inter_700Bold });
@@ -1225,7 +1363,7 @@ Thêm vào JSX, ngay dưới khối banner:
 ```tsx
 <Image source={require('../assets/demo/photo.png')} style={styles.demo} />
 <Text style={fontsLoaded ? styles.fontDemo : undefined}>
-  Mẫu font tùy chỉnh 0123456789
+  Mau font tuy chinh 0123456789
 </Text>
 ```
 
@@ -1240,30 +1378,29 @@ fontDemo: { fontFamily: 'Inter_700Bold', fontSize: 18, marginBottom: 12 },
 
 ```bash
 npm run export:android
-GITHUB_USER=<user> REPO_NAME=<repo> npm run publish:update
-cd site && git add -A && git commit -m "publish: thêm assets" && git push && cd ..
+npm run publish:update
+cd site && git add -A && git commit -m "publish: them assets" && git push && cd ..
 ```
 
 - [ ] **Step 4: Xác nhận assets nằm trong manifest và tải được**
 
 ```bash
-curl -s https://<user>.github.io/<repo>/production/1.0.0/android/manifest.json \
-  | grep -o '"url":"[^"]*"' | head -20
+curl -s https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json
 ```
 
-Chọn một URL trong `store/` có đuôi `.png` hoặc `.ttf` rồi:
+Chọn một `url` trong `/store/` có đuôi `.png` hoặc `.ttf` rồi:
 
 ```bash
-curl -I <url-đó>
+curl -I <url-vừa-chọn>
 ```
 
-Kỳ vọng: `HTTP/2 200`. Đây là chỗ rủi ro của spec mục 9 — nếu ra 404 thì dừng lại và kiểm tra `.nojekyll` cùng việc file đã được commit lên `gh-pages` chưa.
+Kỳ vọng: `HTTP/2 200`. Đây là chỗ rủi ro của spec mục 9 — nếu ra 404 thì dừng lại, kiểm tra `.nojekyll` và xem file đã được commit lên `gh-pages` chưa.
 
 - [ ] **Step 5: KỊCH BẢN E2E #2 — update asset**
 
 1. Trên app: check → fetch → restart. Xác nhận ảnh và font mới xuất hiện.
-2. Thay ảnh bằng một icon khác hẳn về mặt thị giác: `cp assets/adaptive-icon.png assets/demo/photo.png` (hoặc file PNG thứ hai đã chọn ở Step 1).
-3. `npm run export:android` và publish lại.
+2. Thay bằng ảnh khác hẳn: `cp assets/adaptive-icon.png assets/demo/photo.png` (hoặc file PNG thứ hai đã chọn ở Step 1).
+3. `npm run export:android` rồi `npm run publish:update`, commit và push trong `site/`.
 4. Trên app: check → fetch → restart.
 
 Kỳ vọng: ảnh đổi sang ảnh mới. Đây là bằng chứng asset thực sự được cập nhật qua OTA chứ không phải chỉ có JS.
@@ -1273,16 +1410,18 @@ Kỳ vọng: ảnh đổi sang ảnh mới. Đây là bằng chứng asset thự
 ```bash
 git add assets/ src/UpdatePanel.tsx package.json package-lock.json
 git commit -m "feat: demo update assets (ảnh + font) qua OTA"
+git push
 ```
 
 ---
 
 ### Task 7: Rollback tự động — kịch bản E2E #3
 
-Lớp L1 của spec mục 6. Không cần viết code — task này xác minh `expo-updates` thực sự tự phục hồi.
+Lớp L1 của spec mục 6. Không viết code — task này xác minh `expo-updates` thực sự tự phục hồi.
 
 **Files:**
 - Modify: `src/version.ts` (tạm thời, sẽ hoàn nguyên)
+- Create: `docs/rollback-notes.md`
 
 **Interfaces:**
 - Consumes: pipeline publish của Task 5
@@ -1292,12 +1431,12 @@ Lớp L1 của spec mục 6. Không cần viết code — task này xác minh `e
 
 Mở app, ghi lại `updateId` đang chạy. Đây là bản mà app phải quay về.
 
-- [ ] **Step 2: Tạo một bundle crash ngay lúc khởi động**
+- [ ] **Step 2: Tạo bundle crash ngay lúc khởi động**
 
 Thêm vào **đầu** `src/version.ts`, ở cấp module (không nằm trong hàm nào):
 
 ```ts
-throw new Error('CRASH CỐ Ý — kiểm tra rollback tự động');
+throw new Error('CRASH CO Y — kiem tra rollback tu dong');
 ```
 
 Phải ở cấp module thì lỗi mới xảy ra trong lúc nạp bundle, tức là lúc `expo-updates` còn đang theo dõi và có thể can thiệp.
@@ -1306,36 +1445,39 @@ Phải ở cấp module thì lỗi mới xảy ra trong lúc nạp bundle, tức
 
 ```bash
 npm run export:android
-GITHUB_USER=<user> REPO_NAME=<repo> npm run publish:update
-cd site && git add -A && git commit -m "publish: bundle hỏng cố ý" && git push && cd ..
+npm run publish:update
+cd site && git add -A && git commit -m "publish: bundle hong co y" && git push && cd ..
 ```
 
 - [ ] **Step 4: KỊCH BẢN E2E #3 — rollback tự động**
 
-1. Mở app, check → fetch → restart
+1. Trên app: check → fetch → restart
 2. App sẽ crash hoặc chớp màn hình lỗi
 3. Mở lại app
 
-Kỳ vọng: app chạy lại được bằng bản **trước** đó (hoặc bản embedded). `isEmergencyLaunch` có thể là `true` và `emergencyLaunchReason` có nội dung. `updateId` **không phải** id của bản hỏng.
+Kỳ vọng: app chạy lại được bằng bản **trước** đó (hoặc bản embedded). `isEmergencyLaunch` có thể là `true`. `updateId` **không phải** id của bản hỏng.
 
-Ghi lại quan sát thực tế vào `docs/rollback-notes.md` — hành vi chính xác (quay về bản trước hay về embedded) phụ thuộc trạng thái cache trên máy, và biết chắc điều này quan trọng cho Task 8.
+- [ ] **Step 5: Ghi lại quan sát vào `docs/rollback-notes.md`**
 
-- [ ] **Step 5: Hoàn nguyên bundle hỏng và publish bản lành**
+Ghi rõ: id bản hỏng, id bản app quay về, giá trị `isEmbeddedLaunch` và `isEmergencyLaunch` quan sát được. Hành vi chính xác (quay về bản trước hay về embedded) phụ thuộc trạng thái cache trên máy, và biết chắc điều này là cần thiết để diễn giải kết quả Task 8 và 9.
+
+- [ ] **Step 6: Hoàn nguyên và publish bản lành**
 
 ```bash
 # xóa dòng throw khỏi src/version.ts
 npm run export:android
-GITHUB_USER=<user> REPO_NAME=<repo> npm run publish:update
-cd site && git add -A && git commit -m "publish: khôi phục bundle lành" && git push && cd ..
+npm run publish:update
+cd site && git add -A && git commit -m "publish: khoi phuc bundle lanh" && git push && cd ..
 ```
 
 Xác nhận trên app: check → fetch → restart, app chạy bình thường trở lại.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add src/version.ts docs/rollback-notes.md
 git commit -m "docs: xác minh rollback tự động khi bundle crash lúc khởi động"
+git push
 ```
 
 ---
@@ -1350,7 +1492,7 @@ Lớp L2 của spec mục 6.
 - Modify: `package.json`
 
 **Interfaces:**
-- Consumes: `findRelease`, `appendRelease`, `readReleases`, `UpdateManifest`, `uuidFromSha256Hex`, `sha256Hex`
+- Consumes: `findRelease`, `appendRelease`, `readReleases`, `readConfig`, `UpdateManifest`, `uuidFromSha256Hex`, `sha256Hex`, `writeJson`, `gitSha`
 - Produces: `rollbackManifest(source: UpdateManifest, createdAt: string): UpdateManifest`
 
 - [ ] **Step 1: Viết test thất bại**
@@ -1407,16 +1549,18 @@ Kỳ vọng: FAIL — không tìm thấy `./rollback`.
 
 - [ ] **Step 3: Viết `tools/rollback.ts`**
 
+Id đích nhận qua **tham số dòng lệnh**, không qua biến môi trường — chạy giống nhau trên mọi shell.
+
 ```ts
 import { join } from 'node:path';
-import { loadConfig, manifestPathFor, releasesPathFor } from './config';
+import { manifestPathFor, readConfig, releasesPathFor } from './config';
 import { sha256Hex, uuidFromSha256Hex } from './hashing';
 import { gitSha, writeJson } from './io';
 import type { UpdateManifest } from './manifest';
 import { appendRelease, findRelease, readReleases } from './releases';
 
 export function rollbackManifest(source: UpdateManifest, createdAt: string): UpdateManifest {
-  // id mới bắt buộc: client ghi nhớ id đã chạy VÀ id đã đánh dấu lỗi,
+  // id mới là bắt buộc: client ghi nhớ id đã chạy VÀ id đã đánh dấu lỗi,
   // nên phát lại manifest cũ nguyên xi sẽ bị bỏ qua.
   return {
     ...source,
@@ -1426,10 +1570,12 @@ export function rollbackManifest(source: UpdateManifest, createdAt: string): Upd
 }
 
 function main(): void {
-  const targetId = process.env.TARGET_UPDATE_ID;
-  if (!targetId) throw new Error('Thiếu biến môi trường bắt buộc: TARGET_UPDATE_ID');
+  const targetId = process.argv[2];
+  if (!targetId) {
+    throw new Error('Thiếu id đích. Dùng: npm run rollback:update -- <updateId>');
+  }
 
-  const cfg = loadConfig(process.env);
+  const cfg = readConfig(process.cwd());
   const releasesAbs = join(cfg.siteDir, releasesPathFor(cfg));
   const releases = readReleases(releasesAbs, {
     channel: cfg.channel,
@@ -1441,7 +1587,6 @@ function main(): void {
   const manifest = rollbackManifest(target.manifest, new Date().toISOString());
 
   writeJson(join(cfg.siteDir, manifestPathFor(cfg)), manifest);
-
   writeJson(
     releasesAbs,
     appendRelease(releases, {
@@ -1456,12 +1601,11 @@ function main(): void {
   console.log(`Đã rollback về ${targetId}, phát hành thành update mới ${manifest.id}`);
 }
 
+// Vitest đặt biến VITEST — cho phép import rollbackManifest mà không chạy main().
 if (process.env.VITEST === undefined) {
   main();
 }
 ```
-
-Điều kiện `VITEST` cho phép import `rollbackManifest` trong test mà không kích hoạt `main()`.
 
 - [ ] **Step 4: Chạy test, xác nhận pass**
 
@@ -1479,20 +1623,21 @@ Kỳ vọng: PASS, 34 test.
 
 - [ ] **Step 6: KỊCH BẢN E2E #4 — rollback thủ công**
 
-1. Lấy danh sách các bản đã phát hành:
-
-```bash
-curl -s https://<user>.github.io/<repo>/production/1.0.0/android/releases.json \
-  | grep -o '"id": "[^"]*"' | head -10
-```
-
-2. Chọn id của một bản **cũ** (ví dụ bản `v1`), rồi:
+1. Đồng bộ worktree và xem danh sách bản đã phát hành:
 
 ```bash
 cd site && git pull && cd ..
-GITHUB_USER=<user> REPO_NAME=<repo> TARGET_UPDATE_ID=<id-cũ> npm run rollback:update
-cd site && git add -A && git commit -m "rollback: quay về <id-cũ>" && git push && cd ..
+cat site/production/1.0.0/android/releases.json
 ```
+
+2. Chọn `id` của một bản **cũ** (ví dụ bản `v1 — EMBEDDED` hoặc `v2 — OTA`), rồi:
+
+```bash
+npm run rollback:update -- <id-cũ>
+cd site && git add -A && git commit -m "rollback" && git push && cd ..
+```
+
+Dấu `--` là bắt buộc để npm chuyển tham số xuống script.
 
 3. Trên app: check → fetch → restart
 
@@ -1503,65 +1648,82 @@ Kỳ vọng: app hiện lại nội dung của bản cũ (banner và ảnh của
 ```bash
 git add tools/rollback.ts tools/rollback.test.ts package.json
 git commit -m "feat(tools): rollback thủ công bằng cách phát lại bản cũ như update mới"
+git push
 ```
 
 ---
 
-### Task 9: Version gating — kịch bản E2E #5
+### Task 9: Version gating và channel gating — kịch bản E2E #5
 
 **Files:**
-- không tạo file mới; dùng biến môi trường `RUNTIME_VERSION`
+- Modify: `update.config.json` (tạm thời, hoàn nguyên ở cuối task)
+- Create: `docs/gating-notes.md`
 
 **Interfaces:**
-- Consumes: `loadConfig`, `manifestPathFor`
+- Consumes: `readConfig`, `manifestPathFor`
 - Produces: không có
 
-- [ ] **Step 1: Publish vào một runtimeVersion khác**
+- [ ] **Step 1: Đưa app về trạng thái "không còn update nào chờ"**
+
+Trước khi kiểm tra gating, app phải đã áp dụng bản mới nhất của channel `production` / runtimeVersion `1.0.0`. Nếu không, kết quả `available=true` sẽ đến từ bản còn tồn đọng chứ không phải từ bản gating, và phép thử trở nên vô nghĩa.
+
+Trên app: check → fetch → restart, lặp cho tới khi **Kiểm tra update** cho `available=false`.
+
+- [ ] **Step 2: Publish vào một runtimeVersion khác**
+
+Sửa `update.config.json`, đổi `"runtimeVersion": "1.0.0"` thành `"2.0.0"`, rồi:
 
 ```bash
-RUNTIME_VERSION=2.0.0 npm run export:android
-GITHUB_USER=<user> REPO_NAME=<repo> RUNTIME_VERSION=2.0.0 npm run publish:update
+npm run export:android
+npm run publish:update
 cd site && git add -A && git commit -m "publish: runtimeVersion 2.0.0" && git push && cd ..
 ```
 
-- [ ] **Step 2: Xác nhận manifest mới tồn tại ở đường dẫn riêng**
+- [ ] **Step 3: Xác nhận hai manifest tồn tại ở hai đường dẫn riêng**
 
 ```bash
-curl -sI https://<user>.github.io/<repo>/production/2.0.0/android/manifest.json
-curl -sI https://<user>.github.io/<repo>/production/1.0.0/android/manifest.json
+curl -sI https://hoanghdtv.github.io/expo-app-update/production/2.0.0/android/manifest.json
+curl -sI https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json
 ```
 
-Kỳ vọng: cả hai trả 200, và là hai file khác nhau.
+Kỳ vọng: cả hai trả 200.
 
-- [ ] **Step 3: KỊCH BẢN E2E #5 — gating**
+- [ ] **Step 4: KỊCH BẢN E2E #5a — version gating**
 
-App đang chạy được build với `RUNTIME_VERSION=1.0.0`, nên URL của nó trỏ tới `.../1.0.0/android/manifest.json`.
+App đang chạy được build ở Task 1 với `runtimeVersion` `1.0.0`, nên URL của nó trỏ tới `.../1.0.0/android/manifest.json`. Bản build native **không** đổi theo `update.config.json` — chỉ bản build mới mới đọc giá trị mới.
 
 Trên app: bấm **Kiểm tra update**.
 
-Kỳ vọng: log ghi `available=false`. App **không** nhìn thấy bản `2.0.0`, vì nó không có đường nào để nhìn tới đường dẫn đó. Đây là bằng chứng gating theo path hoạt động (spec mục 3.2, quyết định B).
+Kỳ vọng: `available=false`. App **không** nhìn thấy bản `2.0.0` vì nó không có đường nào để nhìn tới đường dẫn đó. Đây là bằng chứng gating theo path hoạt động (spec mục 3.2, quyết định B).
 
-- [ ] **Step 4: Xác nhận chiều ngược lại**
+- [ ] **Step 5: KỊCH BẢN E2E #5b — channel gating**
+
+Sửa `update.config.json`: đưa `runtimeVersion` về `"1.0.0"` và đổi `"channel"` thành `"staging"`, rồi:
 
 ```bash
-UPDATE_CHANNEL=staging npm run export:android
-GITHUB_USER=<user> REPO_NAME=<repo> UPDATE_CHANNEL=staging npm run publish:update
+npm run export:android
+npm run publish:update
 cd site && git add -A && git commit -m "publish: channel staging" && git push && cd ..
 ```
 
-Trên app (build ở channel `production`): bấm **Kiểm tra update** → `available=false`.
+Trên app (được build ở channel `production`): bấm **Kiểm tra update**.
 
-Kỳ vọng: channel gating hoạt động theo đúng cơ chế đó.
+Kỳ vọng: `available=false`.
 
-- [ ] **Step 5: Ghi kết quả**
+- [ ] **Step 6: Hoàn nguyên `update.config.json`**
 
-Tạo `docs/gating-notes.md` ghi lại kết quả hai kịch bản, kèm URL manifest cụ thể đã dùng.
+Đưa về `"channel": "production"` và `"runtimeVersion": "1.0.0"`. Xác nhận bằng cách so với nội dung ở Task 1 Step 3 — phải giống hệt.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Ghi kết quả vào `docs/gating-notes.md`**
+
+Ghi rõ hai kịch bản, URL manifest cụ thể đã dùng, và kết quả `available` quan sát được ở mỗi kịch bản.
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add docs/gating-notes.md
+git add update.config.json docs/gating-notes.md
 git commit -m "docs: xác minh gating theo runtimeVersion và channel"
+git push
 ```
 
 ---
@@ -1576,6 +1738,8 @@ git commit -m "docs: xác minh gating theo runtimeVersion và channel"
 - Produces: không có
 
 - [ ] **Step 1: Viết `.github/workflows/publish.yml`**
+
+CI ghi đè `update.config.json` từ input trước khi chạy, giữ đúng nguyên tắc "một nguồn sự thật".
 
 ```yaml
 name: Publish update
@@ -1608,25 +1772,27 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
-      - run: npm run export:android
+      - name: Áp input vào update.config.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const c = JSON.parse(fs.readFileSync('update.config.json', 'utf-8'));
+            c.channel = process.env.CHANNEL;
+            c.runtimeVersion = process.env.RUNTIME_VERSION;
+            fs.writeFileSync('update.config.json', JSON.stringify(c, null, 2) + '\n');
+          "
+          cat update.config.json
         env:
-          UPDATE_CHANNEL: ${{ inputs.channel }}
+          CHANNEL: ${{ inputs.channel }}
           RUNTIME_VERSION: ${{ inputs.runtimeVersion }}
-          GITHUB_USER: ${{ github.repository_owner }}
-          REPO_NAME: ${{ github.event.repository.name }}
 
+      - run: npm run export:android
       - run: npm run publish:update
-        env:
-          UPDATE_CHANNEL: ${{ inputs.channel }}
-          RUNTIME_VERSION: ${{ inputs.runtimeVersion }}
-          GITHUB_USER: ${{ github.repository_owner }}
-          REPO_NAME: ${{ github.event.repository.name }}
-          SITE_DIR: site
 
       - name: Commit lên gh-pages
         working-directory: site
@@ -1638,7 +1804,7 @@ jobs:
           git push
 ```
 
-Hai lần `actions/checkout` là chủ ý: `site/` phải là checkout thật của `gh-pages` để `store/` giữ lại toàn bộ file cũ. Đây là yêu cầu merge-không-replace ở spec mục 4.1 — nếu thay bằng action publish kiểu "xóa và thay toàn bộ", rollback sẽ hỏng.
+Hai lần `actions/checkout` là chủ ý: `site/` phải là checkout thật của `gh-pages` để `store/` giữ lại toàn bộ file cũ. Đây là yêu cầu merge-không-replace ở spec mục 4.1 — thay bằng action publish kiểu "xóa và thay toàn bộ" sẽ làm hỏng rollback.
 
 - [ ] **Step 2: Viết `.github/workflows/rollback.yml`**
 
@@ -1676,19 +1842,25 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
 
-      - run: npm run rollback:update
+      - name: Áp input vào update.config.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const c = JSON.parse(fs.readFileSync('update.config.json', 'utf-8'));
+            c.channel = process.env.CHANNEL;
+            c.runtimeVersion = process.env.RUNTIME_VERSION;
+            fs.writeFileSync('update.config.json', JSON.stringify(c, null, 2) + '\n');
+          "
         env:
-          UPDATE_CHANNEL: ${{ inputs.channel }}
+          CHANNEL: ${{ inputs.channel }}
           RUNTIME_VERSION: ${{ inputs.runtimeVersion }}
-          TARGET_UPDATE_ID: ${{ inputs.targetUpdateId }}
-          GITHUB_USER: ${{ github.repository_owner }}
-          REPO_NAME: ${{ github.event.repository.name }}
-          SITE_DIR: site
+
+      - run: npm run rollback:update -- "${{ inputs.targetUpdateId }}"
 
       - name: Commit lên gh-pages
         working-directory: site
@@ -1696,26 +1868,33 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --staged --quiet || git commit -m "rollback: về ${{ inputs.targetUpdateId }}"
+          git diff --staged --quiet || git commit -m "rollback: ve ${{ inputs.targetUpdateId }}"
           git push
 ```
 
 - [ ] **Step 3: Chạy thử workflow publish**
 
-Vào tab Actions của repo, chạy **Publish update** với channel `production` và runtimeVersion `1.0.0`.
+```bash
+git add .github/
+git commit -m "feat: workflow CI publish/rollback"
+git push
+gh workflow run "Publish update" -f channel=production -f runtimeVersion=1.0.0
+gh run watch
+```
 
-Kỳ vọng: job xanh, có commit mới trên `gh-pages`, app nhận được update.
+Kỳ vọng: job xanh, có commit mới trên `gh-pages`. Trên app: check → fetch → restart, nhận được update.
 
 - [ ] **Step 4: Viết `README.md`**
 
 Nội dung bắt buộc có:
 
 - Kiến trúc trong một đoạn, kèm link tới spec
-- Cách build: `npx expo run:android --variant release` và **lý do bản debug không dùng được**
-- Cách publish thủ công và qua CI
-- Cách rollback, kèm cách tra `releases.json` để lấy id
-- **Độ trễ CDN ~10 phút** của `manifest.json` trên GitHub Pages — đây là hành vi đúng như thiết kế, không phải lỗi
-- Những gì cố ý không hỗ trợ: iOS, code signing, directive `rollBackToEmbedded`, đổi channel lúc runtime (kèm lý do: nó xung đột với rollback tự động)
+- `update.config.json` là nguồn sự thật duy nhất; đổi channel/runtimeVersion nghĩa là sửa file này
+- Cách build: `npx expo run:android --variant release`, và **lý do bản debug không dùng được**
+- Cách publish thủ công (`npm run export:android` rồi `npm run publish:update`, commit trong `site/`) và qua CI
+- Cách rollback: đọc `releases.json` lấy id, rồi `npm run rollback:update -- <id>`
+- **Độ trễ CDN ~10 phút** của `manifest.json` trên GitHub Pages — đúng như thiết kế, không phải lỗi
+- Những gì cố ý không hỗ trợ: iOS, code signing, directive `rollBackToEmbedded`, đổi channel lúc runtime (kèm lý do: xung đột với rollback tự động)
 
 - [ ] **Step 5: Chạy toàn bộ test lần cuối**
 
@@ -1728,8 +1907,9 @@ Kỳ vọng: PASS, 34 test.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add .github/ README.md
-git commit -m "feat: workflow CI publish/rollback và tài liệu"
+git add README.md
+git commit -m "docs: README hướng dẫn vận hành"
+git push
 ```
 
 ---
@@ -1738,14 +1918,15 @@ git commit -m "feat: workflow CI publish/rollback và tài liệu"
 
 | Mục spec | Task |
 |---|---|
-| 2.1 manifest JSON thuần | 5 (bước 10) |
-| 2.2 gating theo path | 1 (bước 2), 9 |
-| 2.3 không có directive | 10 (bước 4, ghi rõ trong README) |
-| 2.4 "không có update mới" bằng cách so id | 9 (bước 3) |
+| 2.1 manifest JSON thuần | 5 (Step 12) |
+| 2.2 gating theo path | 1 (Step 4), 9 |
+| 2.3 không có directive | 10 (Step 4, ghi rõ trong README) |
+| 2.4 "không có update mới" bằng cách so id | 9 (Step 4) |
+| 3.0 tham số cấu hình tập trung | 1 (Step 3), 5 (Step 3) |
 | 3.2 store content-addressed | 4 |
-| 3.2 `.nojekyll` | 1 (bước 7) |
+| 3.2 `.nojekyll` | 1 (Step 10) |
 | 3.3 định dạng manifest | 2, 4 |
-| 4.1 sync merge-không-replace | 5 (bước 9), 10 (bước 1) |
+| 4.1 sync merge-không-replace | 5 (Step 11), 10 (Step 1) |
 | 4.2 `releases.json` | 5 |
 | 4.3 GitHub Actions | 10 |
 | 4.4 rollback = update mới | 8 |
@@ -1755,4 +1936,4 @@ git commit -m "feat: workflow CI publish/rollback và tài liệu"
 | 6 rollback L2 | 8 |
 | 8.1 unit test | 2, 3, 4, 5, 8 |
 | 8.2 E2E #1–#5 | 5, 6, 7, 8, 9 |
-| 9 spike hosting sớm | 1 (bước 8) |
+| 9 spike hosting sớm | 1 (Step 11) |
