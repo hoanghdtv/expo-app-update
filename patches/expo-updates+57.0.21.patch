@@ -1,0 +1,17 @@
+diff --git a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
+index df75ec4..2c20381 100644
+--- a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
++++ b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
+@@ -31,7 +31,11 @@ data class ResponseHeaderData(
+    */
+   private val manifestFiltersRaw: String? = null
+ ) {
+-  val protocolVersion = protocolVersionRaw?.let { Integer.valueOf(it) }
++  // POC hot update qua CDN GitHub tĩnh: GitHub Pages không đặt được header
++  // tùy chỉnh, nên response manifest không có `expo-protocol-version`.
++  // Manifest ta sinh ra là manifest v1 thật, nên mặc định coi là v1.
++  // Chốt chặn gốc trong UpdateFactory.kt được chính Expo đánh dấu là tạm thời.
++  val protocolVersion = protocolVersionRaw?.let { Integer.valueOf(it) } ?: 1
+ 
+   val serverDefinedHeaders: JSONObject? by lazy {
+     serverDefinedHeadersRaw?.let { headerDictionaryToJSONObject(it) }
