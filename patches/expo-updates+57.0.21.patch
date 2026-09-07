@@ -2,7 +2,7 @@ diff --git a/node_modules/expo-updates/android/src/main/java/expo/modules/update
 index df75ec4..2c20381 100644
 --- a/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
 +++ b/node_modules/expo-updates/android/src/main/java/expo/modules/updates/manifest/ResponseHeaderData.kt
-@@ -31,7 +31,11 @@ data class ResponseHeaderData(
+@@ -31,7 +31,26 @@ data class ResponseHeaderData(
     */
    private val manifestFiltersRaw: String? = null
  ) {
@@ -11,6 +11,17 @@ index df75ec4..2c20381 100644
 +  // tùy chỉnh, nên response manifest không có `expo-protocol-version`.
 +  // Manifest ta sinh ra là manifest v1 thật, nên mặc định coi là v1.
 +  // Chốt chặn gốc trong UpdateFactory.kt được chính Expo đánh dấu là tạm thời.
++  //
++  // BÁN KÍNH ẢNH HƯỞNG — protocolVersion được đọc ở HAI nơi:
++  //   1. UpdateFactory.getUpdate() — chỗ ta cần vá; null ở đây ném
++  //      "Legacy manifests are no longer supported".
++  //   2. FileDownloader.parseRemoteUpdateResponse() — nhánh xử lý HTTP 204
++  //      No Content, điều kiện `protocolVersion != null && > 0`.
++  // Vì vậy bản vá cũng đổi ngữ nghĩa nhánh 204: một response rỗng bất thường
++  // (lỗi mạng hoặc CDN) trước đây ném lỗi rõ ràng, nay bị coi là "không có
++  // update" và im lặng. Với host tĩnh hiện tại đây là đường chết — GitHub
++  // Pages luôn trả 200 kèm body — nhưng nếu sau này chuyển sang một server
++  // thật có trả 204, hãy cân nhắc vá tại UpdateFactory.kt thay vì ở đây.
 +  val protocolVersion = protocolVersionRaw?.let { Integer.valueOf(it) } ?: 1
  
    val serverDefinedHeaders: JSONObject? by lazy {
