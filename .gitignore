@@ -1,0 +1,9 @@
+node_modules/
+.expo/
+dist/
+site/
+android/
+ios/
+.tmp-scaffold/
+*.log
+.DS_Store
