@@ -22,7 +22,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test:tools": "vitest run tools"
+    "test:tools": "vitest run tools",
+    "export:android": "expo export --platform android && tsx tools/expo-config.ts",
+    "publish:update": "tsx tools/publish.ts"
   },
   "private": true
 }
