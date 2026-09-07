@@ -4,14 +4,24 @@ import { manifestPathFor, releasesPathFor, resolveConfig } from './config';
 const FILE = {
   githubUser: 'hoanghdtv',
   repoName: 'expo-app-update',
+  baseUrl: 'https://expo-app-update.pages.dev',
   channel: 'production',
   runtimeVersion: '1.0.0',
   platform: 'android',
 };
 
 describe('resolveConfig', () => {
-  it('dựng baseUrl từ githubUser và repoName', () => {
-    expect(resolveConfig(FILE).baseUrl).toBe('https://hoanghdtv.github.io/expo-app-update');
+  it('lấy baseUrl trực tiếp từ file cấu hình', () => {
+    expect(resolveConfig(FILE).baseUrl).toBe('https://expo-app-update.pages.dev');
+  });
+
+  it('cắt bỏ dấu / ở cuối baseUrl', () => {
+    const cfg = resolveConfig({ ...FILE, baseUrl: 'https://expo-app-update.pages.dev/' });
+    expect(cfg.baseUrl).toBe('https://expo-app-update.pages.dev');
+  });
+
+  it('báo lỗi nêu đích danh baseUrl khi thiếu', () => {
+    expect(() => resolveConfig({ ...FILE, baseUrl: '' })).toThrow(/baseUrl/);
   });
 
   it('mặc định siteDir là site và distDir là dist', () => {

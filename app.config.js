@@ -1,6 +1,6 @@
 const cfg = require('./update.config.json');
 
-const BASE_URL = `https://${cfg.githubUser}.github.io/${cfg.repoName}`;
+const BASE_URL = cfg.baseUrl.replace(/\/$/, '');
 
 module.exports = {
   expo: {

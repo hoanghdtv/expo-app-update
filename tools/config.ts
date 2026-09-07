@@ -4,19 +4,19 @@ import { join } from 'node:path';
 export type UpdateConfigFile = {
   githubUser: string;
   repoName: string;
+  baseUrl: string;
   channel: string;
   runtimeVersion: string;
   platform: string;
 };
 
 export type PublishConfig = UpdateConfigFile & {
-  baseUrl: string;
   siteDir: string;
   distDir: string;
 };
 
 const REQUIRED_KEYS: (keyof UpdateConfigFile)[] = [
-  'githubUser', 'repoName', 'channel', 'runtimeVersion', 'platform',
+  'githubUser', 'repoName', 'baseUrl', 'channel', 'runtimeVersion', 'platform',
 ];
 
 export function resolveConfig(file: UpdateConfigFile): PublishConfig {
@@ -27,7 +27,7 @@ export function resolveConfig(file: UpdateConfigFile): PublishConfig {
   }
   return {
     ...file,
-    baseUrl: `https://${file.githubUser}.github.io/${file.repoName}`,
+    baseUrl: file.baseUrl.replace(/\/$/, ''),
     siteDir: 'site',
     distDir: 'dist',
   };
