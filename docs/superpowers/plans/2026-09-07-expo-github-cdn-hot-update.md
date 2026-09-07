@@ -26,7 +26,21 @@
 
 Repo đích: **`hoanghdtv/expo-app-update`, public**. Public là bắt buộc — GitHub Pages trên repo private đòi tài khoản Pro trả phí.
 
-URL update site: `https://hoanghdtv.github.io/expo-app-update`
+## ⚠️ SỬA ĐỔI KIẾN TRÚC — 2026-09-07, phát hiện khi thực thi Task 5
+
+Ràng buộc "chỉ GitHub, không server khác" đã được chứng minh là **bất khả thi**. Client `expo-updates` bắt buộc nhận response header `expo-protocol-version` trên mọi response manifest; thiếu nó, `UpdateFactory.kt` ném `"Legacy manifests are no longer supported"`. GitHub Pages không đặt được header tùy chỉnh. Chi tiết và bằng chứng ở **mục 2.3b của spec**.
+
+**Tầng phục vụ mới: Cloudflare Pages.** File vẫn nằm trong GitHub trên nhánh `gh-pages` (nguồn sự thật, lưu lịch sử cho rollback); Cloudflare Pages đứng trước làm CDN và đọc file `_headers` để thêm header bắt buộc. Không có code server.
+
+Những gì đổi trong kế hoạch này:
+- `update.config.json` có thêm trường `baseUrl` tường minh; `resolveConfig` không còn dựng URL từ `githubUser` + `repoName`.
+- Nhánh `gh-pages` có thêm file `_headers` khai báo `expo-protocol-version: 1`.
+- **Mọi quy trình publish từ Task 6 trở đi có thêm một bước cuối**: sau khi commit và push trong `site/`, chạy `npx wrangler pages deploy site/ --project-name=expo-app-update` để đẩy lên CDN.
+- URL trong các task từ Task 6 trở đi dùng `https://expo-app-update.pages.dev`.
+
+Các URL `github.io` còn sót lại trong Task 1, 4, 5 được giữ nguyên có chủ đích — chúng là hồ sơ ghi lại những gì đã thực sự chạy tại thời điểm đó.
+
+URL update site: `https://expo-app-update.pages.dev` (nguồn: nhánh `gh-pages` trên GitHub)
 
 ## Global Constraints
 
@@ -41,6 +55,8 @@ URL update site: `https://hoanghdtv.github.io/expo-app-update`
 - `fileExtension` trong manifest **có dấu chấm đứng đầu** (`.png`).
 - `store/` **chỉ được cộng thêm**, không bao giờ xóa file — rollback phụ thuộc vào điều này.
 - Nhánh `gh-pages` **bắt buộc** có file `.nojekyll` ở gốc.
+- Nhánh `gh-pages` **bắt buộc** có file `_headers` ở gốc khai báo `expo-protocol-version: 1`. Thiếu nó, client ném `"Legacy manifests are no longer supported"` và không update nào áp dụng được. Đây là ràng buộc cứng, không có cờ cấu hình nào tắt được.
+- Mỗi lần publish hoặc rollback đều phải kết thúc bằng `npx wrangler pages deploy site/ --project-name=expo-app-update`. Commit lên `gh-pages` mới chỉ là lưu lịch sử; chưa deploy thì CDN chưa thấy nội dung mới.
 - **Không** bật `disableAntiBrickingMeasures` và **không** dùng `Updates.setUpdateURLAndRequestHeadersOverride()` — chúng vô hiệu hóa rollback tự động.
 - Mọi lệnh build để test update phải là **release variant** (`--variant release`). Bản debug nạp JS từ Metro và bỏ qua `expo-updates` hoàn toàn.
 - **Không dùng biến môi trường để cấu hình.** Cú pháp `VAR=x npm run ...` không chạy trên PowerShell/cmd, và việc `app.config.js` với bộ publish đọc hai nguồn khác nhau sẽ gây lệch URL âm thầm. Nguồn sự thật duy nhất là `update.config.json`, cả app lẫn tooling cùng đọc.
@@ -1397,7 +1413,7 @@ cd site && git add -A && git commit -m "publish: them assets" && git push && cd 
 - [ ] **Step 4: Xác nhận assets nằm trong manifest và tải được**
 
 ```bash
-curl -s https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json
+curl -s https://expo-app-update.pages.dev/production/1.0.0/android/manifest.json
 ```
 
 Chọn một `url` trong `/store/` có đuôi `.png` hoặc `.ttf` rồi:
@@ -1694,8 +1710,8 @@ cd site && git add -A && git commit -m "publish: runtimeVersion 2.0.0" && git pu
 - [ ] **Step 3: Xác nhận hai manifest tồn tại ở hai đường dẫn riêng**
 
 ```bash
-curl -sI https://hoanghdtv.github.io/expo-app-update/production/2.0.0/android/manifest.json
-curl -sI https://hoanghdtv.github.io/expo-app-update/production/1.0.0/android/manifest.json
+curl -sI https://expo-app-update.pages.dev/production/2.0.0/android/manifest.json
+curl -sI https://expo-app-update.pages.dev/production/1.0.0/android/manifest.json
 ```
 
 Kỳ vọng: cả hai trả 200.
